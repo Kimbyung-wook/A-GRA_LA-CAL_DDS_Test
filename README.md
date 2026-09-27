@@ -33,8 +33,15 @@ python tools/run_demo.py --dds            # 2 servers bridged by DDS; prints the
   Only this `schemaLocation` was changed; the content is otherwise identical.
 * The schema carries "Distribution Statement A. Approved for public release: distribution is unlimited."
 * `schema/primitives.json` is a cache of the `UCI_PRIMITIVE` annotations. It is rebuilt automatically when missing.
-* To re-import the XSDs from an ASK distribution (for example a newer release), run
-  `python tools/prepare_schema.py --src <ASK>/A-GRA_standard/Schema`.
+* To re-import the XSDs (for example a newer ASK release), download them from the
+  [Open Arsenal A-GRA repository](https://gitlab.com/open-arsenal/a-gra/standard) (GitLab)
+  or copy them from a local checkout. Both paths apply the same include fix:
+  ```
+  python tools/prepare_schema.py --download [--ref main]          # branch, tag or commit
+  python tools/prepare_schema.py --src <checkout>/Schema
+  ```
+  Without options the script uses `../OpenArsenalGit/A-GRA_standard/Schema` if it exists. Otherwise it
+  keeps the bundled schema and prints the commands above.
 
 Manual run (three terminals):
 ```

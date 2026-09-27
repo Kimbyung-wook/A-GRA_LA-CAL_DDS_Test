@@ -29,8 +29,14 @@ python tools/run_demo.py --dds            # DDS로 연결된 서버 2개, 서버
   이 `schemaLocation` 한 곳만 고쳤고 나머지 내용은 원본과 같습니다.
 * 스키마에는 "Distribution Statement A. Approved for public release: distribution is unlimited." 표기가 있습니다.
 * `schema/primitives.json`은 `UCI_PRIMITIVE` 주석을 추출한 캐시입니다. 없으면 자동으로 다시 만듭니다.
-* ASK 배포본(예: 새 릴리스)에서 XSD를 다시 가져오려면
-  `python tools/prepare_schema.py --src <ASK>/A-GRA_standard/Schema`를 실행합니다.
+* XSD를 다시 가져오려면(예: ASK 새 릴리스) [Open Arsenal A-GRA 저장소](https://gitlab.com/open-arsenal/a-gra/standard)(GitLab)에서
+  내려받거나 로컬 checkout에서 복사합니다. 두 방식 모두 같은 include 보정을 적용합니다.
+  ```
+  python tools/prepare_schema.py --download [--ref main]          # 브랜치, 태그 또는 커밋
+  python tools/prepare_schema.py --src <checkout>/Schema
+  ```
+  옵션 없이 실행하면 `../OpenArsenalGit/A-GRA_standard/Schema`가 있을 때 그 경로를 씁니다. 없으면 포함된
+  스키마를 그대로 두고 위 명령을 안내합니다.
 
 수동 실행(터미널 3개):
 ```
