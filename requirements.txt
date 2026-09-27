@@ -1,0 +1,7 @@
+websockets>=13
+xmlschema>=3.4
+lxml>=5
+cyclonedds>=0.10.5
+pyyaml>=6
+pytest>=8
+pytest-asyncio>=0.24

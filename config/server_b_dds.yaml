@@ -1,0 +1,32 @@
+# CAL Server Network Configuration (OMSC-SPC-013 4.5) - server B of a two-server ASB over DDS.
+server_id: calsrv-b
+system_uuid: 2d8dbabb-3d2d-49ec-bc91-21b7014ea6d9
+system_label: AGRA-Demo-MS-1
+listen: {host: 127.0.0.1, port: 8775}
+admin: {host: 127.0.0.1, port: 8776}
+schema:
+  path: schema/A-GRA_MessageDefinitions_v6_0_a.xsd
+  versions: ["006.0.ASK"]
+owp_versions: ["1.0"]
+allowed_topics: ["ms.*", "ma.*", "test.*"]
+accept_unknown_services: false
+backend: {type: dds, domain: 0}
+graph: {inactive_after_s: 10}
+
+services:
+  ma_core:                      # Mission Autonomy component (node_a)
+    service: 3f14303d-b1c6-40f4-a096-c0660b1bb634
+    components: {comms_manager: 07119c48-d946-425d-85c2-e8649b79a841}
+    declared:                   # Service Contract view, compared with observed traffic in the graph
+      pub: [MA_MessagingSubscriptionSettingCommand@ms.dms, MA_TxDataPayloadCommand@ms.dms]
+      sub: [MA_MessagingSubscriptionSettingCommandStatus@ms.dms, MA_TxDataPayloadCommandStatus@ms.dms,
+            MA_MessagingSubscriptionStatus@ms.dms, MA_RxDataPayload@ms.dms]
+  ms_dms:                       # Mission Systems Decentralized Messaging Service mock (node_b)
+    service: 13766ed8-477b-4da3-92ae-b6ecc6be71ed
+    subsystem: 531e0a1e-cad0-4b33-baac-02a6f5a8ed61
+    declared:
+      pub: [MA_MessagingSubscriptionSettingCommandStatus@ms.dms, MA_TxDataPayloadCommandStatus@ms.dms,
+            MA_MessagingSubscriptionStatus@ms.dms, MA_RxDataPayload@ms.dms]
+      sub: [MA_MessagingSubscriptionSettingCommand@ms.dms, MA_TxDataPayloadCommand@ms.dms]
+  test_client:                  # used by tests / manual websocat sessions
+    service: 8692549c-55c3-43d0-96a1-e338303ccfe5

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Small schema reproducing the constructs used by the OMS JSON examples (OMSC-SPC-013 6.1). -->
+<xs:schema xmlns:uci="https://www.vdl.afrl.af.mil/programs/oam" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="https://www.vdl.afrl.af.mil/programs/oam" elementFormDefault="qualified" version="001.0.TEST">
+  <xs:element name="MyElement" type="xs:boolean"/>
+  <xs:element name="MyComplex" type="uci:MyComplexType"/>
+  <xs:element name="MyEmpty" type="uci:EmptyType"/>
+  <xs:element name="Shapes" type="uci:ShapesType"/>
+  <xs:simpleType name="UniversallyUniqueIdentifierType">
+    <xs:restriction base="xs:hexBinary"><xs:length value="16"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ColorEnum">
+    <xs:restriction base="xs:string"><xs:enumeration value="RED"/><xs:enumeration value="BLUE"/></xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="EmptyType"><xs:sequence/></xs:complexType>
+  <xs:complexType name="MyComplexType">
+    <xs:sequence>
+      <xs:element name="A" type="xs:string"/>
+      <xs:element name="B" type="xs:string" minOccurs="0" maxOccurs="2"/>
+      <xs:element name="Id" type="uci:UniversallyUniqueIdentifierType" minOccurs="0"/>
+      <xs:element name="Count" type="xs:unsignedShort" minOccurs="0"/>
+      <xs:element name="Ratio" type="xs:double" minOccurs="0"/>
+      <xs:element name="Price" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="Flag" type="xs:boolean" minOccurs="0"/>
+      <xs:choice minOccurs="0">
+        <xs:element name="Color" type="uci:ColorEnum"/>
+        <xs:element name="Code" type="xs:int"/>
+      </xs:choice>
+      <xs:element name="When" type="xs:dateTime" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ShapeType" abstract="true">
+    <xs:sequence><xs:element name="Name" type="xs:string"/></xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CircleType">
+    <xs:complexContent><xs:extension base="uci:ShapeType">
+      <xs:sequence><xs:element name="Radius" type="xs:double"/></xs:sequence>
+    </xs:extension></xs:complexContent>
+  </xs:complexType>
+  <xs:complexType name="ShapesType">
+    <xs:sequence><xs:element name="Shape" type="uci:ShapeType" maxOccurs="unbounded"/></xs:sequence>
+  </xs:complexType>
+</xs:schema>
