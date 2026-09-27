@@ -22,11 +22,20 @@ node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cy
 ## Quick start
 ```
 pip install -r requirements.txt
-python tools/prepare_schema.py            # copies the XSDs, fixes the SecurityMarkings include name
 python -m pytest                          # 76 tests, includes a 2-server DDS test
 python tools/run_demo.py                  # 1 server, local routing
 python tools/run_demo.py --dds            # 2 servers bridged by DDS; prints the cross-server graph
 ```
+### Schema
+`schema/` already contains the A-GRA 6.0a XSDs, so no preparation step is needed after cloning.
+* `A-GRA_MessageDefinitions_v6_0_a.xsd` is a **patched copy**. Upstream it includes
+  `A-GRA_SecurityMarkings_v6_0.xsd`, but the ASK ships that file as `A-GRA_SecurityMarkings_v6_0_a.xsd`.
+  Only this `schemaLocation` was changed; the content is otherwise identical.
+* The schema carries "Distribution Statement A. Approved for public release: distribution is unlimited."
+* `schema/primitives.json` is a cache of the `UCI_PRIMITIVE` annotations. It is rebuilt automatically when missing.
+* To re-import the XSDs from an ASK distribution (for example a newer release), run
+  `python tools/prepare_schema.py --src <ASK>/A-GRA_standard/Schema`.
+
 Manual run (three terminals):
 ```
 python -m server --config config/server_a.yaml

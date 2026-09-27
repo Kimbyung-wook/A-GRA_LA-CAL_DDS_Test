@@ -18,11 +18,20 @@ node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cy
 ## 빠른 시작
 ```
 pip install -r requirements.txt
-python tools/prepare_schema.py            # XSD 복사 및 SecurityMarkings include 파일명 보정
 python -m pytest                          # 테스트 76개 (서버 2개 DDS 테스트 포함)
 python tools/run_demo.py                  # 서버 1개, 로컬 라우팅
 python tools/run_demo.py --dds            # DDS로 연결된 서버 2개, 서버 간 병합 그래프 출력
 ```
+### 스키마
+`schema/`에 A-GRA 6.0a XSD가 이미 들어 있으므로 clone 후 별도 준비 단계가 필요 없습니다.
+* `A-GRA_MessageDefinitions_v6_0_a.xsd`는 **보정된 사본**입니다. 원본은 `A-GRA_SecurityMarkings_v6_0.xsd`를
+  include하지만, ASK에 실제로 들어 있는 파일명은 `A-GRA_SecurityMarkings_v6_0_a.xsd`입니다.
+  이 `schemaLocation` 한 곳만 고쳤고 나머지 내용은 원본과 같습니다.
+* 스키마에는 "Distribution Statement A. Approved for public release: distribution is unlimited." 표기가 있습니다.
+* `schema/primitives.json`은 `UCI_PRIMITIVE` 주석을 추출한 캐시입니다. 없으면 자동으로 다시 만듭니다.
+* ASK 배포본(예: 새 릴리스)에서 XSD를 다시 가져오려면
+  `python tools/prepare_schema.py --src <ASK>/A-GRA_standard/Schema`를 실행합니다.
+
 수동 실행(터미널 3개):
 ```
 python -m server --config config/server_a.yaml
