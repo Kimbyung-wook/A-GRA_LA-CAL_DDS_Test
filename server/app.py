@@ -4,7 +4,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from http import HTTPStatus
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
@@ -16,11 +18,14 @@ from .graph import GraphModel
 from .omsjson import OmsJsonCodec
 from .router import Router, Tap
 from .session import FailConnection, Session
+from .clock import now
+from .trace import TraceBus
 
 log = logging.getLogger(__name__)
 
 OWP_SUBPROTOCOL = "owp"
 STATS_INTERVAL_S = 1.0
+MONITOR_HTML = Path(__file__).with_name("monitor.html")
 
 
 class CalServer:
@@ -29,7 +34,8 @@ class CalServer:
         self.codec = codec or OmsJsonCodec(config.schema_path)
         self.graph = GraphModel(config.server_id, config.system_label, config.system_uuid,
                                 config.graph_inactive_after_s)
-        self.router = Router(self.graph, config.server_id)
+        self.trace = TraceBus(config.server_id)
+        self.router = Router(self.graph, config.server_id, self.trace)
         self.sessions: set[Session] = set()
         self._servers = []
         self._tasks: list[asyncio.Task] = []
@@ -107,7 +113,7 @@ class CalServer:
     # ------------------------------------------------------------------ admin API
     def _admin_http(self, conn: ServerConnection, request: Request) -> Response | None:
         url = urlsplit(request.path)
-        if url.path in ("/graph/events", "/tap"):
+        if url.path in ("/graph/events", "/tap", "/trace/events"):
             if "upgrade" not in request.headers.get("Connection", "").lower():
                 return conn.respond(HTTPStatus.UPGRADE_REQUIRED, "WebSocket endpoint\n")
             return None  # continue with the WebSocket handshake
@@ -120,6 +126,8 @@ class CalServer:
             "/stats": lambda: _json({"server_id": self.config.server_id, "sessions": len(self.sessions),
                                      **self.router.stats}),
             "/healthz": lambda: ("ok\n", "text/plain"),
+            "/trace": lambda: _json(list(self.trace.recent)),
+            "/monitor": lambda: (MONITOR_HTML.read_text(encoding="utf-8"), "text/html"),
         }
         handler = routes.get(url.path)
         if handler is None:
@@ -135,6 +143,9 @@ class CalServer:
         url = urlsplit(ws.request.path)
         if url.path == "/graph/events":
             await self._graph_events(ws)
+        elif url.path == "/trace/events":
+            since = parse_qs(url.query).get("since", ["0"])[0]
+            await self._trace_events(ws, int(since) if since.isdigit() else 0)
         elif url.path == "/tap":
             q = parse_qs(url.query)
             await self._tap(ws, q.get("topic", [None])[0], q.get("msg", [None])[0])
@@ -146,6 +157,15 @@ class CalServer:
             await _pump(ws, queue)
         finally:
             self.graph.unlisten(queue)
+
+    async def _trace_events(self, ws: ServerConnection, since: int) -> None:
+        queue = self.trace.listen(since)
+        try:
+            await ws.send(json.dumps({"kind": "hello", "server_id": self.config.server_id,
+                                      "system_label": self.config.system_label, "t": now()}))
+            await _pump(ws, queue)
+        finally:
+            self.trace.unlisten(queue)
 
     async def _tap(self, ws: ServerConnection, topic: str | None, msg: str | None) -> None:
         queue: asyncio.Queue = asyncio.Queue(1000)

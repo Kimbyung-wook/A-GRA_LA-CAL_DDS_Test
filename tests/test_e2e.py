@@ -78,6 +78,19 @@ async def test_two_servers_over_dds(agra_codec):
             snap = a_srv.graph.snapshot()
             assert {s["server_id"] for s in snap["servers"]} == {"dds-a", "dds-b"}
             assert a_srv.router.stats["remote_out"] >= 2 and b_srv.router.stats["remote_in"] >= 2
+            # Trace: A records dds_out, B records dds_in with the QoS chosen from the UCI primitive.
+            outs = {e["message"]: e["qos"] for e in a_srv.trace.recent if e["kind"] == "dds_out"}
+            ins = [e for e in b_srv.trace.recent if e["kind"] == "dds_in"]
+            assert outs == {"SystemStatus": "BEST_EFFORT", "MA_TxDataPayloadCommand": "RELIABLE"}
+            cmd_in = next(e for e in ins if e["message"] == "MA_TxDataPayloadCommand")
+            assert cmd_in["from_server"] == "dds-a" and cmd_in["qos"] == "RELIABLE"
+            assert cmd_in["summary"]["id_field"] == "CommandID"
+            assert any(e["kind"] == "deliver" and e["origin"] == "dds-a" for e in b_srv.trace.recent)
+            # Causality across processes: pub(A) < dds_out(A) < dds_in(B) < deliver(B), strictly.
+            pub_a = next(e for e in a_srv.trace.recent if e["kind"] == "pub" and e["message"] == "MA_TxDataPayloadCommand")
+            out_a = next(e for e in a_srv.trace.recent if e["kind"] == "dds_out" and e["message"] == "MA_TxDataPayloadCommand")
+            dlv_b = next(e for e in b_srv.trace.recent if e["kind"] == "deliver" and e["message"] == "MA_TxDataPayloadCommand")
+            assert pub_a["t"] <= out_a["t"] < cmd_in["t"] <= dlv_b["t"]
         # When B goes away (dispose on stop / liveliness loss), A removes B's subgraph.
         await b_srv.stop()
         assert await wait_for(lambda: "dds-b" not in a_srv.graph.remote, timeout=10)

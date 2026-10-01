@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Protocol
+
+from . import primitives
+from .clock import now
+from .trace import TraceBus, summarize
 
 if TYPE_CHECKING:
     from .graph import GraphModel
@@ -56,9 +61,10 @@ class Tap:
 
 
 class Router:
-    def __init__(self, graph: "GraphModel", server_id: str):
+    def __init__(self, graph: "GraphModel", server_id: str, trace: TraceBus | None = None):
         self.graph = graph
         self.server_id = server_id
+        self.trace = trace or TraceBus(server_id)
         self.backend: Backend | None = None
         self._subs: dict[tuple[str, str], list[Subscription]] = {}
         self._rr: dict[tuple[str, str], itertools.count] = {}
@@ -84,14 +90,18 @@ class Router:
         return set(self._subs)
 
     # ------------------------------------------------------------------ publishing
-    def publish_local(self, origin_node_id: str, env: Envelope, message: str) -> None:
+    def publish_local(self, origin_node_id: str, env: Envelope, message: str, origin: str | None = None) -> None:
         """A PUB accepted from a local client: deliver locally and forward to the backend."""
         self.stats["published"] += 1
         self.graph.note_pub(origin_node_id, env.message_name, env.cal_topic, len(env.payload))
-        self._deliver(env.message_name, env.cal_topic, message, origin_node_id)
+        self._deliver(env.message_name, env.cal_topic, message, origin_node_id, origin)
         if self.backend is not None:
+            # Stamp before write(): the peer may receive and trace the sample before write() returns.
+            t_out = now()
             self.backend.publish(env)
             self.stats["remote_out"] += 1
+            self.trace.emit("dds_out", t=t_out, service=origin, topic=env.cal_topic, message=env.message_name,
+                            bytes=len(env.payload), qos=_qos(env.message_name))
 
     def publish_remote(self, env: Envelope) -> None:
         """A message received from another CAL Server via the backend."""
@@ -101,10 +111,15 @@ class Router:
             log.warning("dropping %s: unsupported payload encoding %d", env.message_name, env.encoding)
             return
         self.stats["remote_in"] += 1
-        self._deliver(env.message_name, env.cal_topic, env.payload.decode("utf-8"),
-                      f"remote:{env.server_id}:{env.src_service}")
+        message = env.payload.decode("utf-8")
+        self.trace.emit("dds_in", topic=env.cal_topic, message=env.message_name, bytes=len(env.payload),
+                        qos=_qos(env.message_name), from_server=env.server_id,
+                        from_service_uuid=env.src_service, summary=_summary_of(message))
+        self._deliver(env.message_name, env.cal_topic, message, f"remote:{env.server_id}:{env.src_service}",
+                      env.server_id)
 
-    def _deliver(self, message_name: str, topic: str, message: str, origin: str) -> None:
+    def _deliver(self, message_name: str, topic: str, message: str, origin: str,
+                 origin_label: str | None = None) -> None:
         for tap in list(self.taps):
             if tap.topic in (None, topic) and tap.message_name in (None, message_name):
                 try:
@@ -131,3 +146,17 @@ class Router:
             ok = s.owner.deliver(s, message)
             self.stats["delivered" if ok else "dropped"] += 1
             self.graph.note_delivery(s.owner.node_id, s.sub_id, nbytes, dropped=not ok)
+            self.trace.emit("deliver" if ok else "drop", node_id=s.owner.node_id,
+                            service=getattr(s.owner, "service_id", None), topic=topic, message=message_name,
+                            sub_id=s.sub_id, group=s.group, bytes=nbytes, origin=origin_label or origin)
+
+
+def _qos(message_name: str) -> str:
+    return "RELIABLE" if primitives.is_reliable(message_name) else "BEST_EFFORT"
+
+
+def _summary_of(message: str) -> dict:
+    try:
+        return summarize(json.loads(message))
+    except ValueError:
+        return {}

@@ -84,7 +84,8 @@ async def run(args) -> int:
             "AddTopicSubscription": [{"Topic": "SystemStatus", "SubscriptionID": {"UUID": new_uuid()}}]},
             args.timeout)
         ok += state == "ACCEPTED"
-        for _ in range(args.count):
+        sent = 0
+        while args.count == 0 or sent < args.count:  # --count 0: run until interrupted
             inner = node.system_status()
             state = await node.command("MA_TxDataPayloadCommand", {
                 "EncodedPayload": encode_payload(codec, inner),
@@ -93,9 +94,10 @@ async def run(args) -> int:
                 "Timestamp": now_iso(),
                 "DestinationRouting": "TOPIC_AND_SPECIFIC_DESTINATION"}, args.timeout)
             ok += state == "ACCEPTED"
+            sent += 1
             await asyncio.sleep(args.interval)
         await asyncio.sleep(0.5)  # let looped-back MA_RxDataPayload arrive
-        expected = args.count + 1
+        expected = sent + 1
         print(f"commands accepted: {ok}/{expected}  RxDataPayload: {node.rx_payloads}  "
               f"SubscriptionStatus: {node.sub_status}")
         if node.rtts:
@@ -104,7 +106,7 @@ async def run(args) -> int:
         if args.linger:
             log.info("lingering %.0fs (graph stays visible)", args.linger)
             await asyncio.sleep(args.linger)
-        return 0 if ok == expected and node.rx_payloads == args.count else 1
+        return 0 if ok == expected and node.rx_payloads == sent else 1
 
 
 def main() -> None:
@@ -112,13 +114,16 @@ def main() -> None:
     ap.add_argument("--url", default=DEFAULT_URL)
     ap.add_argument("--service", default="ma_core")
     ap.add_argument("--topic", default=DMS_TOPIC)
-    ap.add_argument("--count", type=int, default=5)
+    ap.add_argument("--count", type=int, default=5, help="payload commands to send (0 = forever)")
     ap.add_argument("--interval", type=float, default=0.2)
     ap.add_argument("--timeout", type=float, default=5.0)
     ap.add_argument("--linger", type=float, default=0.0)
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)s")
-    sys.exit(asyncio.run(run(args)))
+    try:
+        sys.exit(asyncio.run(run(args)))
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

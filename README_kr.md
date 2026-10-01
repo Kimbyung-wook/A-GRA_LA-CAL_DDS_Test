@@ -1,4 +1,4 @@
-# agra_lacal: OMS Language-Agnostic CAL 위에서 A-GRA 메시지 송/수신
+# agra_lacal: OMS-LACAL 로 A-GRA 메시지 송/수신하기
 
 > English: [README.md](README.md)
 
@@ -18,10 +18,18 @@ node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cy
 ## 빠른 시작
 ```
 pip install -r requirements.txt
-python -m pytest                          # 테스트 76개 (서버 2개 DDS 테스트 포함)
+python -m pytest                          # 테스트 80개 (서버 2개 DDS 테스트 포함)
 python tools/run_demo.py                  # 서버 1개, 로컬 라우팅
 python tools/run_demo.py --dds            # DDS로 연결된 서버 2개, 서버 간 병합 그래프 출력
+python tools/run_demo.py --dds --live     # 계속 실행하면서 실시간 모니터 열기 (Ctrl+C로 종료)
 ```
+
+### 실시간 모니터링
+모든 라우팅 단계(PUB, MSG 전달, DDS 송/수신, 오류, 연결/구독)가 타임스탬프가 붙은 트레이스 이벤트로 기록됩니다.
+* **웹:** `http://127.0.0.1:8766/monitor`에서 시퀀스 형태 타임라인, 메시지별 빈도·간격·지터, 명령→응답 RTT를
+  볼 수 있습니다. `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776`을 붙이면 두 서버를 합쳐 봅니다.
+* **터미널:** `python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
+* 이벤트 형식은 `docs/trace_api_kr.md`에 정리했습니다.
 ### 스키마
 `schema/`에 A-GRA 6.0a XSD가 이미 들어 있으므로 clone 후 별도 준비 단계가 필요 없습니다.
 * `A-GRA_MessageDefinitions_v6_0_a.xsd`는 **보정된 사본**입니다. 원본은 `A-GRA_SecurityMarkings_v6_0.xsd`를
@@ -70,7 +78,8 @@ python tools/lacal_cli.py graph            # node_a가 연결을 유지하는 �
 | `server/config.py`, `config/*.yaml` | Network Configuration: 서비스, UUID, 허용 토픽, 백엔드 |
 | `client/lacal_client.py` | asyncio 기반 CAL Client |
 | `tools/json_skeleton.py` | 임의 메시지의 최소 유효 OMS JSON 생성기(`--check`로 검증) |
-| `tools/lacal_cli.py` | `graph`, `service list`, `topic list/info/hz/echo`, `events`, `pub` |
+| `server/trace.py`, `server/monitor.html` | 트레이스 이벤트(`/trace`, `/trace/events`)와 실시간 모니터 페이지(`/monitor`) |
+| `tools/lacal_cli.py` | `graph`, `service list`, `topic list/info/hz/echo`, `events`, `trace`, `pub` |
 | `tests/test_session_certs.py` | CERT LACAL-000001~014의 동작마다 테스트 하나씩 |
 
 ## 규격 해석과 알려진 제약

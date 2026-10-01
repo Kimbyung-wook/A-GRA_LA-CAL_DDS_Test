@@ -7,6 +7,7 @@
     python tools/lacal_cli.py topic hz   <topic> <message>
     python tools/lacal_cli.py topic echo [--topic T] [--msg M]
     python tools/lacal_cli.py events
+    python tools/lacal_cli.py trace [--kinds pub,deliver,dds_in,dds_out,err] [--filter TEXT]
     python tools/lacal_cli.py pub <topic> <file.json|-> [--url ws://...] [--service test_client]
 
 Global option --admin selects the admin endpoint (default http://127.0.0.1:8766).
@@ -16,6 +17,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -108,6 +110,64 @@ def cmd_topic_echo(args) -> None:
     _run(_stream(ws_url(args.admin, "/tap" + (f"?{q}" if q else ""))))
 
 
+def format_trace(ev: dict, prev_t: float | None) -> str:
+    """One line per trace event: time, delta, server, kind, who -> what, size, state/id, timing."""
+    t = time.localtime(ev["t"])
+    stamp = time.strftime("%H:%M:%S", t) + f".{int(ev['t'] * 1e6) % 1000000:06d}"
+    dms = None if prev_t is None else (ev["t"] - prev_t) * 1000
+    delta = "" if dms is None else f"+{dms:.3f}ms" if dms < 10 else f"+{dms:.1f}ms"
+    kind = ev["kind"]
+    s = ev.get("summary") or {}
+    what = f'{ev.get("message", "")}@{ev.get("topic", "")}' if ev.get("message") else ""
+    if kind == "pub":
+        who = f'{ev.get("service")} -> {what}'
+    elif kind in ("deliver", "drop"):
+        who = f'{what} -> {ev.get("service")} ({ev.get("sub_id")}, from {ev.get("origin")})'
+    elif kind == "dds_in":
+        who = f'{ev.get("from_server")} => {what} [{ev.get("qos")}]'
+    elif kind == "dds_out":
+        who = f'{what} => DDS [{ev.get("qos")}]'
+    elif kind == "err":
+        who = f'{ev.get("service")} {ev.get("op")} -ERR {ev.get("code")} {ev.get("detail", "")}'
+    else:
+        who = f'{ev.get("service", "")} {ev.get("sub_id", "")} {what}'.strip()
+    extra = [f'{ev["bytes"]}B'] if ev.get("bytes") else []
+    state = s.get("CommandProcessingState") or s.get("CommandState") or s.get("SystemState")
+    if state:
+        extra.append(state)
+    if s.get("id"):
+        extra.append(f'{s.get("id_field", "id")}={s["id"][:8]}')
+    if ev.get("validate_ms") is not None:
+        extra.append(f'validate {ev["validate_ms"]}ms')
+    color = {"pub": "1", "err": "31", "dds_in": "34", "dds_out": "34", "drop": "31"}.get(kind, "0")
+    head = f"{stamp} {delta:>10} {ev['server_id']:<10} \033[{color}m{kind.upper():<10}\033[0m"
+    return f"{head} {who}  {'  '.join(extra)}".rstrip()
+
+
+def cmd_trace(args) -> None:
+    from websockets.asyncio.client import connect
+    kinds = set(args.kinds.split(",")) if args.kinds else None
+    needle = (args.filter or "").lower()
+    if sys.platform == "win32":
+        os.system("")  # enable ANSI colours in the Windows console
+
+    async def go():
+        prev = None
+        async with connect(ws_url(args.admin, f"/trace/events?since={0 if args.backlog else 10**12}")) as ws:
+            async for frame in ws:
+                ev = json.loads(frame)
+                if ev["kind"] == "hello":
+                    print(f"# tracing {ev['server_id']} ({ev.get('system_label', '')}) via {args.admin}")
+                    continue
+                if kinds and ev["kind"] not in kinds:
+                    continue
+                if needle and needle not in json.dumps(ev).lower():
+                    continue
+                print(format_trace(ev, prev), flush=True)
+                prev = ev["t"]
+    _run(go())
+
+
 def cmd_events(args) -> None:
     _run(_stream(ws_url(args.admin, "/graph/events")))
 
@@ -151,6 +211,11 @@ def main() -> None:
     e.add_argument("--msg")
     e.set_defaults(fn=cmd_topic_echo)
     sp.add_parser("events").set_defaults(fn=cmd_events)
+    tr = sp.add_parser("trace", help="live message timing, one line per routing step")
+    tr.add_argument("--kinds", help="comma list: connect,disconnect,sub,unsub,pub,deliver,drop,dds_out,dds_in,err")
+    tr.add_argument("--filter", help="only events whose JSON contains this text")
+    tr.add_argument("--backlog", action="store_true", help="print the server's recent history first")
+    tr.set_defaults(fn=cmd_trace)
     p = sp.add_parser("pub")
     p.add_argument("topic")
     p.add_argument("file")

@@ -22,10 +22,20 @@ node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cy
 ## Quick start
 ```
 pip install -r requirements.txt
-python -m pytest                          # 76 tests, includes a 2-server DDS test
+python -m pytest                          # 80 tests, includes a 2-server DDS test
 python tools/run_demo.py                  # 1 server, local routing
 python tools/run_demo.py --dds            # 2 servers bridged by DDS; prints the cross-server graph
+python tools/run_demo.py --dds --live     # keep running and open the live monitor (Ctrl+C to stop)
 ```
+
+### Live monitoring
+Every routing step (PUB, MSG delivery, DDS out/in, errors, connect/subscribe) is recorded as a
+timestamped trace event:
+* **Web:** `http://127.0.0.1:8766/monitor` shows a sequence-style timeline, per-message rate, interval
+  and jitter, and command→status RTT. Add `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776` to merge
+  both servers.
+* **Terminal:** `python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
+* The event format is described in `docs/trace_api.md`.
 ### Schema
 `schema/` already contains the A-GRA 6.0a XSDs, so no preparation step is needed after cloning.
 * `A-GRA_MessageDefinitions_v6_0_a.xsd` is a **patched copy**. Upstream it includes
@@ -74,7 +84,8 @@ A-GRA L1 `MA_DataPayloadWrapper`.
 | `server/config.py`, `config/*.yaml` | Network Configuration: services, UUIDs, allowed topics, backend |
 | `client/lacal_client.py` | asyncio CAL Client |
 | `tools/json_skeleton.py` | Minimal valid OMS JSON for any message (`--check` validates it) |
-| `tools/lacal_cli.py` | `graph`, `service list`, `topic list/info/hz/echo`, `events`, `pub` |
+| `server/trace.py`, `server/monitor.html` | Trace events (`/trace`, `/trace/events`) and the live monitor page (`/monitor`) |
+| `tools/lacal_cli.py` | `graph`, `service list`, `topic list/info/hz/echo`, `events`, `trace`, `pub` |
 | `tests/test_session_certs.py` | One test per LACAL-000001..014 CERT behaviour |
 
 ## Interpretations and known limits

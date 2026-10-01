@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LA-CAL Live Monitor</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --lane: #cbd5e1;
+  --owp: #111827; --deliver: #374151; --rel: #1d4ed8; --best: #c2410c; --err: #dc2626; --life: #6b7280;
+  --hl: #fef3c7; --sel: #dbeafe; --ok: #16a34a;
+  font-family: "Segoe UI", "Malgun Gothic", system-ui, sans-serif; font-size: 13px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1115; --panel: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262b36; --lane: #334155;
+          --owp: #e5e7eb; --deliver: #cbd5e1; --rel: #60a5fa; --best: #fb923c; --err: #f87171; --life: #9ca3af;
+          --hl: #3b2f0b; --sel: #1e3a5f; --ok: #4ade80; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); height: 100vh; display: flex; flex-direction: column; }
+header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 14px;
+         background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 15px; margin: 0 8px 0 0; }
+.servers { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; font-size: 12px; white-space: nowrap; }
+.pill .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--err); }
+.pill.up .dot { background: var(--ok); }
+label.k { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+input[type=text] { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; width: 190px; }
+button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button.on { background: var(--sel); }
+.spacer { flex: 1; }
+main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 430px; min-height: 0; }
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 45%; } }
+.timeline { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
+.lanes-head { display: flex; background: var(--panel); border-bottom: 1px solid var(--line); overflow: hidden; }
+.lanes-head .tcol, .row .tcol { flex: 0 0 150px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+.lanes-head .tcol { position: relative; z-index: 1; background: var(--panel); }
+.row .tcol { position: sticky; left: 0; background: var(--bg); z-index: 1; }
+.row:hover .tcol { background: var(--hl); } .row.sel .tcol { background: var(--sel); }
+.lanes-head .lanes { position: relative; height: 44px; flex: 1; will-change: transform; }
+.lane-title { position: absolute; top: 5px; transform: translateX(-50%); text-align: center; font-size: 12px; line-height: 1.25;
+              background: var(--sel); border: 1px solid var(--lane); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
+.lane-title.srv { background: var(--panel); font-weight: 600; }
+.rows { flex: 1; overflow: auto; position: relative; }
+.row { display: flex; height: 24px; align-items: center; cursor: pointer; border-bottom: 1px dotted transparent; }
+.row:hover { background: var(--hl); }
+.row.sel { background: var(--sel); }
+.row .tcol { color: var(--muted); font-size: 11.5px; display: flex; justify-content: space-between; }
+.row .tcol b { color: var(--ink); font-weight: 500; }
+.row svg { flex: 1; height: 24px; overflow: visible; }
+aside { display: flex; flex-direction: column; min-height: 0; overflow: auto; background: var(--panel); }
+aside section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+aside h2 { font-size: 13px; margin: 0 0 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; }
+td.num, th.num { text-align: right; }
+td.msg { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+td.who { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+aside table { table-layout: auto; font-size: 11.5px; }
+aside th, aside td { padding: 3px 3px; }
+.stale { color: var(--muted); }
+pre { margin: 0; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
+.empty { color: var(--muted); padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LA-CAL Live Monitor</h1>
+  <div class="servers" id="servers"></div>
+  <input type="text" id="addsrv" placeholder="+ admin URL (http://host:port)" title="다른 CAL Server의 관리 주소 추가 (Enter)">
+  <span class="spacer"></span>
+  <label class="k"><input type="checkbox" data-k="pub" checked>PUB</label>
+  <label class="k"><input type="checkbox" data-k="deliver" checked>MSG</label>
+  <label class="k"><input type="checkbox" data-k="dds" checked>DDS</label>
+  <label class="k"><input type="checkbox" data-k="life" checked>연결/구독</label>
+  <label class="k"><input type="checkbox" data-k="err" checked>오류</label>
+  <input type="text" id="filter" placeholder="필터: 메시지 / 토픽 / 서비스">
+  <button id="follow" class="on" title="새 이벤트를 따라 자동 스크롤">따라가기</button>
+  <button id="pause">일시정지</button>
+  <button id="clear">지우기</button>
+  <button id="export">JSON 저장</button>
+</header>
+<main>
+  <div class="timeline">
+    <div class="lanes-head"><div class="tcol" style="padding-top:14px;color:var(--muted)">시각 · Δ ms</div><div class="lanes" id="lanesHead"></div></div>
+    <div class="rows" id="rows"><div class="empty" id="empty">이벤트를 기다리는 중… 노드를 실행하면 메시지가 실시간으로 표시됩니다.</div></div>
+  </div>
+  <aside>
+    <section>
+      <h2>메시지 타이밍 <span class="stale" style="font-weight:400">(Hz: 최근 5초 · Δ/지터: 최근 50개 간격)</span></h2>
+      <table><thead><tr><th>메시지 @토픽</th><th>발행자</th><th class="num">건수</th><th class="num">Hz</th>
+        <th class="num">Δ ms</th><th class="num">지터</th><th class="num">경과 s</th></tr></thead>
+        <tbody id="stats"></tbody></table>
+    </section>
+    <section>
+      <h2>명령 → 응답 RTT <span class="stale" style="font-weight:400">(CommandID 매칭, 발행 시점 기준)</span></h2>
+      <table><thead><tr><th>명령</th><th class="num">건수</th><th class="num">최소</th><th class="num">평균</th><th class="num">최대</th><th class="num">최근</th></tr></thead>
+        <tbody id="rtt"></tbody></table>
+    </section>
+    <section>
+      <h2>선택한 이벤트</h2>
+      <pre id="detail" class="stale">타임라인에서 행을 클릭하세요.</pre>
+    </section>
+    <section>
+      <div class="legend">
+        <span><i style="border-color:var(--owp)"></i>PUB (클라이언트→서버)</span>
+        <span><i style="border-color:var(--deliver);border-top-style:dashed"></i>MSG 전달</span>
+        <span><i style="border-color:var(--rel)"></i>DDS RELIABLE</span>
+        <span><i style="border-color:var(--best)"></i>DDS BEST_EFFORT</span>
+        <span style="color:var(--err)">✕ 오류</span><span>● 연결/구독</span>
+      </div>
+    </section>
+  </aside>
+</main>
+<script>
+"use strict";
+const MAX_ROWS = 1500, LANE_PAD = 90, MIN_GAP = 150, TIME_COL = 150;
+let LANE_GAP = 190;
+const params = new URLSearchParams(location.search);
+const servers = new Map();      // admin base URL -> {url, id, label, ws, up, lastSeq}
+const events = [];              // all received events (merged, time ordered)
+let lanes = [];                 // [{key, label, sub, kind}]
+let paused = false, pending = [], selectedSeq = null, lastT = null;
+const show = {pub: true, deliver: true, dds: true, life: true, err: true};
+const stats = new Map(), rtt = new Map(), cmdSent = new Map(), pubSeen = new Map();
+const $ = id => document.getElementById(id);
+
+// ------------------------------------------------------------------ servers / websockets
+function addServer(url) {
+  url = url.replace(/\/+$/, "");
+  if (!/^https?:\/\//.test(url)) url = "http://" + url;
+  if (servers.has(url)) return;
+  const s = {url, id: null, label: url.replace(/^https?:\/\//, ""), ws: null, up: false, lastSeq: 0};
+  servers.set(url, s);
+  seedServices(s);
+  connect(s);
+  renderServers();
+}
+function connect(s) {
+  const ws = new WebSocket(s.url.replace(/^http/, "ws") + "/trace/events?since=" + s.lastSeq);
+  s.ws = ws;
+  ws.onopen = () => { s.up = true; renderServers(); };
+  ws.onclose = () => { s.up = false; renderServers(); setTimeout(() => connect(s), 1500); };
+  ws.onmessage = m => {
+    const ev = JSON.parse(m.data);
+    if (ev.kind === "hello") { s.id = ev.server_id; s.label = ev.server_id; renderServers(); ensureLane("srv:" + ev.server_id); return; }
+    s.lastSeq = Math.max(s.lastSeq, ev.seq);
+    if (paused) pending.push(ev); else ingest(ev);
+  };
+}
+async function seedServices(s) {  // services connected before the backlog window still get a lane
+  try {
+    const list = await (await fetch(s.url + "/services")).json();
+    for (const n of list) if (n.server_id) ensureLane(svcKey(n.server_id, n.service_id));
+  } catch (e) { /* the admin API may be unreachable until the server is up */ }
+}
+function renderServers() {
+  $("servers").innerHTML = "";
+  for (const s of servers.values()) {
+    const el = document.createElement("span");
+    el.className = "pill" + (s.up ? " up" : "");
+    el.innerHTML = `<span class="dot"></span>${esc(s.label)}`;
+    el.title = s.url;
+    $("servers").appendChild(el);
+  }
+}
+
+// ------------------------------------------------------------------ lanes
+const svcKey = (server, service) => `svc:${server}:${service}`;
+function laneKeys(ev) {
+  const srv = "srv:" + ev.server_id, svc = ev.service ? svcKey(ev.server_id, ev.service) : null;
+  switch (ev.kind) {
+    case "pub": return [svc, srv];
+    case "deliver": case "drop": return [srv, svc];
+    case "dds_in": return ["srv:" + ev.from_server, srv];
+    case "dds_out": return [srv, null];
+    default: return [svc || srv, null];
+  }
+}
+function ensureLane(key) {
+  if (!key || lanes.some(l => l.key === key)) return false;
+  const [kind, server, service] = key.split(":");
+  lanes.push(kind === "srv" ? {key, kind, server, label: "CAL Server", sub: server}
+                            : {key, kind, server, label: service, sub: "@" + server});
+  // Order: services of the first server | all servers | services of the other servers.
+  const order = [...new Set(lanes.filter(l => l.kind === "srv").map(l => l.server))];
+  const rank = l => {
+    const i = order.indexOf(l.server);
+    if (l.kind === "srv") return 1000 + i;
+    return i <= 0 ? i : 2000 + i;
+  };
+  lanes.sort((a, b) => rank(a) - rank(b));
+  lanesDirty = true;
+  schedule();
+  return true;
+}
+const laneX = key => { const i = lanes.findIndex(l => l.key === key); return i < 0 ? null : LANE_PAD + i * LANE_GAP; };
+function fitLanes() {
+  const avail = $("rows").clientWidth - TIME_COL - 2 * LANE_PAD - 12;
+  const gap = lanes.length > 1 ? Math.max(MIN_GAP, Math.floor(avail / (lanes.length - 1))) : 190;
+  if (gap === LANE_GAP) return false;
+  LANE_GAP = gap;
+  return true;
+}
+function renderLanes() {
+  fitLanes();
+  const head = $("lanesHead");
+  head.innerHTML = "";
+  head.style.minWidth = (LANE_PAD * 2 + (lanes.length - 1) * LANE_GAP) + "px";
+  for (const l of lanes) {
+    const d = document.createElement("div");
+    d.className = "lane-title" + (l.kind === "srv" ? " srv" : "");
+    d.style.left = laneX(l.key) + "px";
+    d.innerHTML = `${esc(l.label)}<br><span style="color:var(--muted);font-size:11px">${esc(l.sub)}</span>`;
+    head.appendChild(d);
+  }
+}
+
+// ------------------------------------------------------------------ frame batching
+// A monitor that connects receives each server's backlog at once. Rendering is therefore
+// coalesced to one pass per animation frame: new tail events are appended, anything else
+// (lane added, out-of-order merge between servers, filter change) triggers one full redraw.
+let lanesDirty = false, fullDirty = false, tail = [], frameQueued = false;
+function schedule() {
+  if (frameQueued) return;
+  frameQueued = true;
+  requestAnimationFrame(() => {
+    frameQueued = false;
+    if (lanesDirty) { renderLanes(); lanesDirty = false; fullDirty = true; }
+    if (fullDirty) { rerenderRows(); fullDirty = false; tail = []; }
+    else if (tail.length) { const t = tail; tail = []; t.forEach(appendRow); }
+  });
+}
+
+// ------------------------------------------------------------------ ingest + derived timing
+function ingest(ev) {
+  for (const k of laneKeys(ev)) ensureLane(k);
+  const s = ev.summary || {};
+  if (ev.kind === "pub") {
+    track(ev);
+    pubSeen.set(pubKey(ev), ev.t);
+    if (s.id && /Command$/.test(ev.message)) cmdSent.set(s.id, {t: ev.t, message: ev.message});
+    if (s.id && /CommandStatus$/.test(ev.message) && cmdSent.has(s.id)) {
+      const c = cmdSent.get(s.id);
+      ev._rtt = (ev.t - c.t) * 1000;
+      const r = rtt.get(c.message) || {n: 0, sum: 0, min: Infinity, max: 0, last: 0};
+      r.n++; r.sum += ev._rtt; r.min = Math.min(r.min, ev._rtt); r.max = Math.max(r.max, ev._rtt); r.last = ev._rtt;
+      rtt.set(c.message, r);
+    }
+  }
+  if (ev.kind === "dds_in") {
+    // The hop (PUB on the other server -> arrival here) is resolved at render time: the two
+    // servers' streams reach the browser independently, so the PUB may arrive after this event.
+    if (![...servers.values()].some(x => x.id === ev.from_server)) track(ev);  // publisher not monitored
+  }
+  // Keep time order even when several servers are merged; equal timestamps fall back to the
+  // causal order of a routing chain (PUB -> DDS out -> DDS in -> MSG), then per-server seq.
+  let i = events.length;
+  while (i > 0 && after(events[i - 1], ev)) i--;
+  events.splice(i, 0, ev);
+  if (events.length > MAX_ROWS) { events.splice(0, events.length - MAX_ROWS); fullDirty = true; }
+  if (i === events.length - 1) tail.push(ev); else fullDirty = true;
+  schedule();
+}
+const RANK = {connect: 0, sub: 1, err: 2, pub: 2, dds_out: 3, dds_in: 4, deliver: 5, drop: 5, unsub: 6, disconnect: 7};
+function after(a, b) {
+  if (a.t !== b.t) return a.t > b.t;
+  if (RANK[a.kind] !== RANK[b.kind]) return RANK[a.kind] > RANK[b.kind];
+  return a.server_id === b.server_id && a.seq > b.seq;
+}
+const pubKey = ev => `${ev.message}|${ev.topic}|${(ev.summary || {}).id || ""}|${(ev.summary || {}).header_ts || ""}`;
+function track(ev) {
+  const who = ev.kind === "pub" ? `${ev.service}@${ev.server_id}` : `${ev.from_server} (DDS)`;
+  const key = `${ev.message}@${ev.topic}|${who}`;
+  const st = stats.get(key) || {message: ev.message, topic: ev.topic, who, n: 0, times: [], last: 0, deltas: [],
+                                 viaServer: ev.kind === "dds_in" ? ev.from_server : null};
+  if (st.last) { st.deltas.push((ev.t - st.last) * 1000); if (st.deltas.length > 50) st.deltas.shift(); }
+  st.n++; st.last = ev.t; st.times.push(ev.t); if (st.times.length > 200) st.times.shift();
+  stats.set(key, st);
+}
+
+// ------------------------------------------------------------------ rendering
+function visible(ev) {
+  const k = ev.kind;
+  const group = k === "pub" ? "pub" : (k === "deliver" || k === "drop") ? "deliver" : k.startsWith("dds") ? "dds" : k === "err" ? "err" : "life";
+  if (!show[group]) return false;
+  const f = $("filter").value.trim().toLowerCase();
+  if (!f) return true;
+  return [ev.message, ev.topic, ev.service, ev.server_id, ev.from_server, ev.code].some(v => v && String(v).toLowerCase().includes(f));
+}
+const fmtUs = t => fmtTime(t) + String(Math.floor((t * 1e6) % 1000)).padStart(3, "0");
+function fmtTime(t) {
+  const d = new Date(t * 1000), p = (n, w = 2) => String(n).padStart(w, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+}
+function rowFor(ev) {
+  const row = document.createElement("div");
+  row.className = "row" + (ev.seq === selectedSeq && ev.server_id === selectedSrv ? " sel" : "");
+  const dms = lastT == null ? null : (ev.t - lastT) * 1000;
+  const delta = dms == null ? "" : "+" + (dms < 10 ? dms.toFixed(3) : dms.toFixed(1));
+  lastT = ev.t;
+  row.innerHTML = `<div class="tcol"><b>${fmtTime(ev.t)}</b><span>${delta}</span></div>` + svgFor(ev);
+  row.onclick = () => select(ev, row);
+  return row;
+}
+let selectedSrv = null;
+function select(ev, row) {
+  selectedSeq = ev.seq; selectedSrv = ev.server_id;
+  document.querySelectorAll(".row.sel").forEach(r => r.classList.remove("sel"));
+  row.classList.add("sel");
+  ev._hop = hopOf(ev);
+  const {_rtt, _hop, ...raw} = ev;
+  const extra = {};
+  if (_rtt != null) extra.rtt_ms = +_rtt.toFixed(3);
+  if (_hop != null) extra.pub_to_arrival_ms = +_hop.toFixed(3);
+  $("detail").textContent = JSON.stringify({time: fmtTime(ev.t), time_us: fmtUs(ev.t), ...extra, ...raw}, null, 1);
+  $("detail").classList.remove("stale");
+}
+function hopOf(ev) {
+  if (ev.kind !== "dds_in") return null;
+  const t0 = pubSeen.get(pubKey(ev));
+  return t0 == null ? null : (ev.t - t0) * 1000;
+}
+function svgFor(ev) {
+  ev._hop = hopOf(ev);
+  const w = LANE_PAD * 2 + (lanes.length - 1) * LANE_GAP;
+  let g = lanes.map(l => `<line x1="${laneX(l.key)}" y1="0" x2="${laneX(l.key)}" y2="24" stroke="var(--lane)" stroke-dasharray="3 3"/>`).join("");
+  const [a, b] = laneKeys(ev), xa = laneX(a), xb = laneX(b);
+  const s = ev.summary || {};
+  const state = s.CommandProcessingState || s.CommandState || s.SystemState || "";
+  const tip = esc(`${ev.kind} ${ev.message || ""} ${ev.topic ? "@" + ev.topic : ""} ${ev.bytes ? ev.bytes + " B" : ""}`);
+  let label, color, dash = "", marker = true;
+  switch (ev.kind) {
+    case "pub": label = `PUB ${ev.message}${state ? " · " + state : ""}${ev._rtt != null ? ` ↩ ${ev._rtt.toFixed(2)} ms` : ""}`; color = "var(--owp)"; break;
+    case "deliver": label = `MSG ${ev.sub_id} ${ev.message}`; color = "var(--deliver)"; dash = "4 3"; break;
+    case "drop": label = `DROP ${ev.message} (큐 가득 참)`; color = "var(--err)"; dash = "2 2"; break;
+    case "dds_in": label = `DDS ${ev.qos} ${ev.message}${ev._hop != null ? ` · ${ev._hop.toFixed(3)} ms` : ""}`;
+                   color = ev.qos === "RELIABLE" ? "var(--rel)" : "var(--best)"; break;
+    case "dds_out": label = `DDS out ${ev.qos} ${ev.message}`; color = ev.qos === "RELIABLE" ? "var(--rel)" : "var(--best)"; marker = false; break;
+    case "err": label = `✕ -ERR ${ev.code} (${ev.op || ""}) ${ev.detail || ""}`; color = "var(--err)"; marker = false; break;
+    case "connect": label = "● INIT 완료 (연결)"; color = "var(--life)"; marker = false; break;
+    case "disconnect": label = "● 연결 종료"; color = "var(--life)"; marker = false; break;
+    case "sub": label = `● SUB ${ev.sub_id} ${ev.message}${ev.group ? " [" + ev.group + "]" : ""}`; color = "var(--life)"; marker = false; break;
+    case "unsub": label = `● UNSUB ${ev.sub_id} ${ev.message}`; color = "var(--life)"; marker = false; break;
+    default: label = ev.kind; color = "var(--life)"; marker = false;
+  }
+  if (xa != null && xb != null && marker) {
+    const dir = xb > xa ? 1 : -1, x2 = xb - dir * 2;
+    g += `<line x1="${xa}" y1="16" x2="${x2}" y2="16" stroke="${color}" stroke-width="1.6" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`;
+    g += `<path d="M${x2} 16 l${-dir * 7} -4 v8 z" fill="${color}"/>`;
+    const lx = Math.min(xa, xb) + 6;
+    g += `<text x="${lx}" y="11" font-size="11" fill="${color}">${esc(clip(label, Math.abs(xb - xa) / 6.2 + 20))}</text>`;
+  } else if (xa != null) {
+    g += `<circle cx="${xa}" cy="14" r="3.5" fill="${color}"/>`;
+    g += `<text x="${xa + 8}" y="18" font-size="11" fill="${color}">${esc(label)}</text>`;
+  }
+  return `<svg width="${w}" viewBox="0 0 ${w} 24" preserveAspectRatio="xMinYMid meet"><title>${tip}</title>${g}</svg>`;
+}
+const clip = (s, n) => s.length > n ? s.slice(0, Math.max(8, n - 1)) + "…" : s;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+function appendRow(ev) {
+  if (!visible(ev)) return;
+  $("empty")?.remove();
+  const box = $("rows");
+  box.appendChild(rowFor(ev));
+  while (box.children.length > MAX_ROWS) box.removeChild(box.firstChild);
+  if (follow) box.scrollTop = box.scrollHeight;
+}
+function rerenderRows() {
+  const box = $("rows");
+  box.innerHTML = "";
+  lastT = null;
+  const frag = document.createDocumentFragment();
+  for (const ev of events) if (visible(ev)) frag.appendChild(rowFor(ev));
+  box.appendChild(frag);
+  if (follow) box.scrollTop = box.scrollHeight;
+}
+function renderStats() {
+  const now = Date.now() / 1000;
+  const monitored = new Set([...servers.values()].map(x => x.id).filter(Boolean));
+  const rows = [...stats.values()].filter(st => !(st.viaServer && monitored.has(st.viaServer)))
+    .sort((a, b) => (a.topic + a.message).localeCompare(b.topic + b.message));
+  $("stats").innerHTML = rows.map(st => {
+    const recent = st.times.filter(t => now - t <= 5).length / 5;
+    const d = st.deltas, mean = d.length ? d.reduce((x, y) => x + y, 0) / d.length : null;
+    const jit = d.length > 1 ? Math.sqrt(d.reduce((x, y) => x + (y - mean) ** 2, 0) / (d.length - 1)) : null;
+    const age = now - st.last;
+    return `<tr class="${age > 10 ? "stale" : ""}"><td class="msg" title="${esc(st.message)}@${esc(st.topic)}">${esc(st.message)}<span class="stale">@${esc(st.topic)}</span></td>
+      <td class="who" title="${esc(st.who)}">${esc(st.who)}</td><td class="num">${st.n}</td><td class="num">${recent.toFixed(1)}</td>
+      <td class="num">${mean == null ? "–" : mean.toFixed(1)}</td><td class="num">${jit == null ? "–" : jit.toFixed(1)}</td>
+      <td class="num">${age.toFixed(1)}</td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="stale">아직 발행된 메시지가 없습니다.</td></tr>`;
+  $("rtt").innerHTML = [...rtt.entries()].map(([m, r]) =>
+    `<tr><td class="msg" title="${esc(m)}">${esc(m)}</td><td class="num">${r.n}</td><td class="num">${r.min.toFixed(2)}</td>
+     <td class="num">${(r.sum / r.n).toFixed(2)}</td><td class="num">${r.max.toFixed(2)}</td><td class="num">${r.last.toFixed(2)}</td></tr>`
+  ).join("") || `<tr><td colspan="6" class="stale">명령/응답 쌍을 기다리는 중</td></tr>`;
+}
+
+// ------------------------------------------------------------------ controls
+let follow = true;
+$("follow").onclick = e => { follow = !follow; e.target.classList.toggle("on", follow); if (follow) $("rows").scrollTop = $("rows").scrollHeight; };
+$("rows").addEventListener("wheel", () => {
+  const box = $("rows");
+  setTimeout(() => { if (box.scrollTop + box.clientHeight < box.scrollHeight - 30 && follow) { follow = false; $("follow").classList.remove("on"); } }, 50);
+});
+$("pause").onclick = e => {
+  paused = !paused;
+  e.target.textContent = paused ? `재개 (${pending.length})` : "일시정지";
+  e.target.classList.toggle("on", paused);
+  if (!paused) { pending.sort((a, b) => a.t - b.t).forEach(ingest); pending = []; }
+};
+setInterval(() => { if (paused) $("pause").textContent = `재개 (${pending.length})`; }, 500);
+$("clear").onclick = () => { events.length = 0; tail = []; stats.clear(); rtt.clear(); cmdSent.clear(); pubSeen.clear(); rerenderRows(); renderStats(); };
+$("export").onclick = () => {
+  const blob = new Blob([JSON.stringify(events, null, 1)], {type: "application/json"});
+  const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: `lacal_trace_${Date.now()}.json`});
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("rows").addEventListener("scroll", () => { $("lanesHead").style.transform = `translateX(${-$("rows").scrollLeft}px)`; });
+window.addEventListener("resize", () => { if (fitLanes()) { lanesDirty = true; schedule(); } });
+$("filter").oninput = () => { fullDirty = true; schedule(); };
+document.querySelectorAll("input[data-k]").forEach(cb => cb.onchange = () => { show[cb.dataset.k] = cb.checked; fullDirty = true; schedule(); });
+$("addsrv").onkeydown = e => { if (e.key === "Enter" && e.target.value.trim()) { addServer(e.target.value.trim()); e.target.value = ""; } };
+setInterval(renderStats, 500);
+
+// ?admin=http://127.0.0.1:8766,http://127.0.0.1:8776  (default: this page's own server)
+const list = (params.get("admin") || location.origin).split(",").map(s => s.trim()).filter(Boolean);
+list.forEach(addServer);
+renderStats();
+</script>
+</body>
+</html>

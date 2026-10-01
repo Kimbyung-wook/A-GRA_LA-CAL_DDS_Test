@@ -13,6 +13,7 @@ from . import owp_codec as owp
 from .graph import ServiceNode
 from .omsjson import InvalidMessage
 from .router import Envelope, Subscription
+from .trace import summarize
 
 if TYPE_CHECKING:
     from .app import CalServer
@@ -48,6 +49,10 @@ class Session:
         self.subs: dict[str, Subscription] = {}
         self.outbox: asyncio.Queue[str] = asyncio.Queue(server.config.outbound_queue)
 
+    @property
+    def service_id(self) -> str | None:
+        return self.service.service_id if self.service is not None else None
+
     # ------------------------------------------------------------------ outbound
     def send(self, text: str) -> None:
         try:
@@ -81,6 +86,9 @@ class Session:
             if self.state is State.AWAIT_INIT:
                 raise FailConnection(owp.fmt_err(err.code, err.detail)) from err
             self.send(owp.fmt_err(err.code, err.detail))
+            self.server.trace.emit("err", node_id=self.node_id, service=self.service_id,
+                                   op=text.strip(" \t").split(" ", 1)[0][:8], code=err.code,
+                                   detail=err.detail[:200])
         except FailConnection:
             raise
         except Exception as exc:  # pragma: no cover - defensive
@@ -131,11 +139,13 @@ class Session:
             system_label=info["system_label"], uuids=uuids, connected_at=time.time(),
             remote_addr=self.remote_addr,
             declared={"pub": service.declared_pub, "sub": service.declared_sub}))
+        self.server.trace.emit("connect", node_id=self.node_id, service=service_id, remote_addr=self.remote_addr)
         log.info("%s INIT service_id=%s version=%s", self.node_id, service_id, self.version)
 
     def _pub(self, topic: str, message: str) -> None:
         if not self.server.config.topic_allowed(topic):
             raise owp.OwpError(owp.ILLEGAL_STATE, f"topic {topic} is not allowed")
+        t0 = time.perf_counter()
         try:
             name, obj, _xml = self.server.codec.parse_message(message)
         except InvalidMessage as exc:
@@ -145,7 +155,10 @@ class Session:
         env = Envelope(message_name=name, cal_topic=topic, src_system=self.server.config.system_uuid,
                        src_service=self.service.service, server_id=self.server.config.server_id,
                        encoding=1, payload=canonical.encode("utf-8"))
-        self.server.router.publish_local(self.node_id, env, canonical)
+        self.server.trace.emit("pub", node_id=self.node_id, service=self.service_id, topic=topic,
+                               message=name, bytes=len(env.payload), summary=summarize(obj),
+                               validate_ms=round((time.perf_counter() - t0) * 1000, 3))
+        self.server.router.publish_local(self.node_id, env, canonical, origin=self.service_id)
 
     def _sub(self, sub_id: str, message_name: str, topic: str, group: str | None = None) -> None:
         if self.server.codec.global_element(message_name) is None:
@@ -157,12 +170,16 @@ class Session:
         sub = Subscription(self, sub_id, message_name, topic, group)
         self.subs[sub_id] = sub
         self.server.router.add(sub)
+        self.server.trace.emit("sub", node_id=self.node_id, service=self.service_id, topic=topic,
+                               message=message_name, sub_id=sub_id, group=group)
 
     def _unsub(self, sub_id: str) -> None:
         sub = self.subs.pop(sub_id, None)
         if sub is None:
             raise owp.OwpError(owp.ILLEGAL_STATE, f"subscription id {sub_id} is not active")
         self.server.router.remove(sub)
+        self.server.trace.emit("unsub", node_id=self.node_id, service=self.service_id, topic=sub.topic,
+                               message=sub.message_name, sub_id=sub_id)
 
     # ------------------------------------------------------------------ teardown
     def close(self) -> None:
@@ -175,4 +192,5 @@ class Session:
         self.subs.clear()
         if was_ready:
             self.server.graph.remove_service(self.node_id)
+            self.server.trace.emit("disconnect", node_id=self.node_id, service=self.service_id)
         log.info("%s closed", self.node_id)
