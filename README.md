@@ -1,115 +1,103 @@
-# agra_lacal: A-GRA messages over an OMS Language-Agnostic CAL
+# agra_lacal: OMS-LACAL 로 A-GRA 메시지 송/수신하기
 
-> 한국어: [README_kr.md](README_kr.md)
+> English: [README_en.md](README_en.md)
 
-This project is a Python CAL Server and CAL Client for the OMS Language-Agnostic CAL
-(OMSC-SPC-013 RevB, OWP 1.0). It carries the A-GRA 6.0a message set
-(`A-GRA_MessageDefinitions_v6_0_a.xsd`, schema version `006.0.ASK`). Two demo nodes exchange the
-MS-interface DMS Minimum Message Set through it.
+이 프로젝트는 OMS Language-Agnostic CAL(OMSC-SPC-013 RevB, OWP 1.0)을 구현한 Python CAL Server와 CAL Client입니다.
+A-GRA 6.0a 메시지 세트(`A-GRA_MessageDefinitions_v6_0_a.xsd`, 스키마 버전 `006.0.ASK`)를 전달하며,
+데모 노드 두 개가 이를 통해 MS 인터페이스의 DMS Minimum Message Set(MMS)을 주고받습니다.
 
 ```
-node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cyclone DDS (RTPS/CDR) ══ CAL Server B ◄──WS── node_b (DMS mock, "ms_dms")
+node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cyclone DDS (RTPS/CDR) ══ CAL Server B ◄──WS── node_b (DMS 모사, "ms_dms")
 ```
 
-## Why LA-CAL
-* A-GRA (ICD 3.3, 11) requires the OMS CAL/ASB onboard (MS, VI, MA L2) but leaves the CAL
-  implementation, serialization and ASB open.
-* OMS (OMSC-STD-001 6.5.2) defines two CAL families. The Language-Agnostic CAL is the official way to
-  use languages such as Python. It is optional for a Platform and does not replace the C++/Java CALs.
-* Version note: the A-GRA ICD references OMS v2.3, while the LA-CAL spec used here comes from the
-  OMS v2.5 document set.
+## LA-CAL을 선택한 이유
+* A-GRA(ICD §3.3, §11)는 온보드 구간(MS, VI, MA L2)에 OMS CAL/ASB를 요구합니다. 다만 CAL 구현, 직렬화 방식, ASB는 정하지 않습니다.
+* OMS(OMSC-STD-001 §6.5.2)는 CAL을 두 계열로 정의합니다. 그중 Language-Agnostic CAL이 Python 같은 언어를 쓰는 공식 경로입니다. 플랫폼 필수 요소는 아니며, C++/Java CAL을 대체하지도 않습니다.
+* 버전 참고: A-GRA ICD는 OMS v2.3을 참조하지만, 여기서 사용한 LA-CAL 규격은 OMS v2.5 문서입니다.
 
-## Quick start
+## 빠른 시작
 ```
-uv sync                                      # create .venv (Python 3.12) with the versions pinned in uv.lock
-uv run pytest                                # 81 tests, includes a 2-server DDS test
-uv run python tools/run_demo.py              # 1 server, local routing
-uv run python tools/run_demo.py --dds        # 2 servers bridged by DDS; prints the cross-server graph
-uv run python tools/run_demo.py --dds --live # keep running and open the live monitor (Ctrl+C to stop)
+uv sync                                      # uv.lock에 고정된 버전으로 .venv(Python 3.12) 생성
+uv run pytest                                # 테스트 81개 (서버 2개 DDS 테스트 포함)
+uv run python tools/run_demo.py              # 서버 1개, 로컬 라우팅
+uv run python tools/run_demo.py --dds        # DDS로 연결된 서버 2개, 서버 간 병합 그래프 출력
+uv run python tools/run_demo.py --dds --live # 계속 실행하면서 실시간 모니터 열기 (Ctrl+C로 종료)
 ```
 
-### Environment (uv)
-The project is managed with [uv](https://docs.astral.sh/uv/) so its packages never touch the
-system or other projects' Python environments.
-* `pyproject.toml` declares the dependencies (`dev` group: pytest), `.python-version` pins Python 3.12,
-  and `uv.lock` pins every package version. Commit changes to all three together.
-* `uv sync` creates `.venv/` inside the project, downloading Python 3.12 if needed. `uv run <cmd>`
-  runs a command in that environment and re-syncs it first if the lock changed, so no activation is needed.
-  (To use `python ...` directly, activate it: `.venv\Scripts\activate` on Windows, `source .venv/bin/activate` elsewhere.)
-* Add or upgrade a package: `uv add <pkg>` / `uv add --dev <pkg>` / `uv lock --upgrade-package <pkg>`.
-* The project is not installed as a package (`[tool.uv] package = false`); scripts run from the repository root.
+### 실행 환경 (uv)
+이 프로젝트는 [uv](https://docs.astral.sh/uv/)로 관리합니다. 패키지가 시스템 Python이나 다른 프로젝트의
+환경에 섞이지 않습니다.
+* `pyproject.toml`에 의존성(`dev` 그룹: pytest)을, `.python-version`에 Python 3.12를, `uv.lock`에 모든 패키지
+  버전을 고정합니다. 세 파일은 함께 커밋합니다.
+* `uv sync`는 프로젝트 안에 `.venv/`를 만들고, 필요하면 Python 3.12도 내려받습니다. `uv run <명령>`은 그 환경에서
+  명령을 실행하며, lock이 바뀌었으면 먼저 동기화하므로 따로 활성화할 필요가 없습니다.
+  (`python ...`을 직접 쓰려면 활성화합니다. Windows: `.venv\Scripts\activate`, 그 외: `source .venv/bin/activate`)
+* 패키지 추가/업그레이드: `uv add <pkg>` / `uv add --dev <pkg>` / `uv lock --upgrade-package <pkg>`
+* 패키지로 설치하지 않습니다(`[tool.uv] package = false`). 스크립트는 저장소 루트에서 실행합니다.
 
-### Live monitoring
-Every routing step (PUB, MSG delivery, DDS out/in, errors, connect/subscribe) is recorded as a
-timestamped trace event:
-* **Web:** `http://127.0.0.1:8766/monitor` shows a sequence-style timeline, per-message rate, interval
-  and jitter, and command→status RTT. Add `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776` to merge
-  both servers.
-* **Terminal:** `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
-* The event format is described in `docs/trace_api.md`.
-### Schema
-`schema/` already contains the A-GRA 6.0a XSDs, so no preparation step is needed after cloning.
-* `A-GRA_MessageDefinitions_v6_0_a.xsd` is a **patched copy**. Upstream it includes
-  `A-GRA_SecurityMarkings_v6_0.xsd`, but the ASK ships that file as `A-GRA_SecurityMarkings_v6_0_a.xsd`.
-  Only this `schemaLocation` was changed; the content is otherwise identical.
-* The schema carries "Distribution Statement A. Approved for public release: distribution is unlimited."
-* `schema/primitives.json` is a cache of the `UCI_PRIMITIVE` annotations. It is rebuilt automatically when missing.
-* To re-import the XSDs (for example a newer ASK release), download them from the
-  [Open Arsenal A-GRA repository](https://gitlab.com/open-arsenal/a-gra/standard) (GitLab)
-  or copy them from a local checkout. Both paths apply the same include fix:
+### 실시간 모니터링
+모든 라우팅 단계(PUB, MSG 전달, DDS 송/수신, 오류, 연결/구독)가 타임스탬프가 붙은 트레이스 이벤트로 기록됩니다.
+* **웹:** `http://127.0.0.1:8766/monitor`에서 시퀀스 형태 타임라인, 메시지별 빈도·간격·지터, 명령→응답 RTT를
+  볼 수 있습니다. `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776`을 붙이면 두 서버를 합쳐 봅니다.
+* **터미널:** `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
+* 이벤트 형식은 `docs/trace_api_kr.md`에 정리했습니다.
+### 스키마
+`schema/`에 A-GRA 6.0a XSD가 이미 들어 있으므로 clone 후 별도 준비 단계가 필요 없습니다.
+* `A-GRA_MessageDefinitions_v6_0_a.xsd`는 **보정된 사본**입니다. 원본은 `A-GRA_SecurityMarkings_v6_0.xsd`를
+  include하지만, ASK에 실제로 들어 있는 파일명은 `A-GRA_SecurityMarkings_v6_0_a.xsd`입니다.
+  이 `schemaLocation` 한 곳만 고쳤고 나머지 내용은 원본과 같습니다.
+* 스키마에는 "Distribution Statement A. Approved for public release: distribution is unlimited." 표기가 있습니다.
+* `schema/primitives.json`은 `UCI_PRIMITIVE` 주석을 추출한 캐시입니다. 없으면 자동으로 다시 만듭니다.
+* XSD를 다시 가져오려면(예: ASK 새 릴리스) [Open Arsenal A-GRA 저장소](https://gitlab.com/open-arsenal/a-gra/standard)(GitLab)에서
+  내려받거나 로컬 checkout에서 복사합니다. 두 방식 모두 같은 include 보정을 적용합니다.
   ```
-  uv run python tools/prepare_schema.py --download [--ref main]          # branch, tag or commit
+  uv run python tools/prepare_schema.py --download [--ref main]          # 브랜치, 태그 또는 커밋
   uv run python tools/prepare_schema.py --src <checkout>/Schema
   ```
-  Without options the script uses `../OpenArsenalGit/A-GRA_standard/Schema` if it exists. Otherwise it
-  keeps the bundled schema and prints the commands above.
+  옵션 없이 실행하면 `../OpenArsenalGit/A-GRA_standard/Schema`가 있을 때 그 경로를 씁니다. 없으면 포함된
+  스키마를 그대로 두고 위 명령을 안내합니다.
 
-Manual run (three terminals):
+수동 실행(터미널 3개):
 ```
 uv run python -m server --config config/server_a.yaml
 uv run python nodes/node_b.py
 uv run python nodes/node_a.py --count 5 --linger 30
-uv run python tools/lacal_cli.py graph            # while node_a lingers; --dot for Graphviz
+uv run python tools/lacal_cli.py graph            # node_a가 연결을 유지하는 동안 실행, Graphviz 출력은 --dot
 ```
 
-## What is on the wire
-| Hop | Format |
+## 구간별 전송 형태
+| 구간 | 형식 |
 |---|---|
-| Client ⇄ CAL Server | WebSocket text frames. OWP operations `INIT/PUB/SUB/UNSUB` and `INFO/MSG/+OK/-ERR`. Messages are **OMS JSON** (spec 6.1) |
-| Inside the server | OMS JSON → XML (content-model order, `$type`→`xsi:type`, UUID → hexBinary) → **XSD validation** (lxml). Invalid messages get `-ERR Invalid-Message` |
-| CAL Server ⇄ CAL Server | DDS/RTPS carrying a **CDR binary** `lacal::CalEnvelope {message_name, cal_topic, src_system, src_service, server_id, encoding, sequence<octet> payload}`. The payload is canonical OMS JSON (encoding 1). DDS topics are `cal/r/<topic>` (RELIABLE) and `cal/b/<topic>` (BEST_EFFORT), chosen by UCI primitive as in MS L1 Volume 1.2.5.5. UserData QoS carries the SystemID UUID |
-| `EncodedPayload` inside `MA_TxDataPayloadCommand`/`MA_RxDataPayload` | UTF-8 XML of the inner UCI message as hexBinary (MS L1 Volume, L1 boundary) |
+| 클라이언트 ⇄ CAL Server | WebSocket 텍스트 프레임입니다. OWP 명령은 `INIT/PUB/SUB/UNSUB`와 `INFO/MSG/+OK/-ERR`이고, 메시지는 **OMS JSON**(규격 §6.1)입니다 |
+| 서버 내부 | OMS JSON을 XML로 변환(content model 순서 정렬, `$type`→`xsi:type`, UUID→hexBinary)한 뒤 **XSD 검증**(lxml)을 합니다. 유효하지 않으면 `-ERR Invalid-Message`를 반환합니다 |
+| CAL Server ⇄ CAL Server | DDS/RTPS 위에 **CDR 바이너리** 구조체 `lacal::CalEnvelope {message_name, cal_topic, src_system, src_service, server_id, encoding, sequence<octet> payload}`를 싣습니다. payload에는 정규화된 OMS JSON(encoding 1)이 들어갑니다. DDS 토픽은 `cal/r/<topic>`(RELIABLE)과 `cal/b/<topic>`(BEST_EFFORT)이며, MS L1 Volume §1.2.5.5에 따라 UCI primitive로 고릅니다. UserData QoS에는 SystemID UUID를 넣습니다 |
+| `MA_TxDataPayloadCommand`/`MA_RxDataPayload`의 `EncodedPayload` | 내부 UCI 메시지의 UTF-8 XML을 hexBinary로 표현합니다(MS L1 Volume, L1 경계 규정) |
 
-The design uses one generic envelope instead of per-message IDL. The reasons: the CAL spec leaves the
-ASB format open, new or extended messages need no regeneration (MA-L2-002), and it mirrors the
-A-GRA L1 `MA_DataPayloadWrapper`.
+메시지별 IDL 대신 범용 봉투(Envelope) 하나를 쓴 이유는 다음과 같습니다.
+- CAL 규격이 ASB 내부 포맷을 자유롭게 두고 있습니다.
+- 메시지를 추가하거나 확장해도 코드를 다시 생성할 필요가 없습니다(MA-L2-002).
+- A-GRA L1의 `MA_DataPayloadWrapper`와 같은 구조입니다.
 
-## Layout
-| Path | Role |
+## 구성
+| 경로 | 역할 |
 |---|---|
-| `server/omsjson.py` | OMS JSON ⇄ XML codec plus XSD validation. It is checked on all 860 global elements of the schema |
-| `server/owp_codec.py`, `session.py` | OWP parsing and the per-connection state machine (`AWAIT_INIT → READY → CLOSED`) |
-| `server/router.py` | Fan-out, subscription groups (one member per group+topic) and taps |
-| `server/graph.py`, `app.py` | Pub/sub graph and the admin API. The contract is in `docs/graph_api.md` (Korean: `docs/graph_api_kr.md`) |
-| `server/backend_dds.py` | Cyclone DDS backend and graph sync on `lacal/graph` (TRANSIENT_LOCAL, keyed by server) |
-| `server/config.py`, `config/*.yaml` | Network Configuration: services, UUIDs, allowed topics, backend |
-| `client/lacal_client.py` | asyncio CAL Client |
-| `tools/json_skeleton.py` | Minimal valid OMS JSON for any message (`--check` validates it) |
-| `server/trace.py`, `server/monitor.html` | Trace events (`/trace`, `/trace/events`) and the live monitor page (`/monitor`) |
+| `server/omsjson.py` | OMS JSON ⇄ XML 코덱과 XSD 검증. 스키마의 전역 요소 860개 전체로 검증을 마쳤습니다 |
+| `server/owp_codec.py`, `session.py` | OWP 파싱과 연결별 상태 머신(`AWAIT_INIT → READY → CLOSED`) |
+| `server/router.py` | 메시지 분배(fan-out), Subscription Group(그룹+토픽당 한 멤버에게만 전달), 탭 |
+| `server/graph.py`, `app.py` | pub/sub 그래프와 관리 API. JSON 형식은 `docs/graph_api_kr.md`에 정의했습니다 |
+| `server/backend_dds.py` | Cyclone DDS 백엔드. `lacal/graph` 토픽(TRANSIENT_LOCAL, 서버별 key)으로 그래프를 동기화합니다 |
+| `server/config.py`, `config/*.yaml` | Network Configuration: 서비스, UUID, 허용 토픽, 백엔드 |
+| `client/lacal_client.py` | asyncio 기반 CAL Client |
+| `tools/json_skeleton.py` | 임의 메시지의 최소 유효 OMS JSON 생성기(`--check`로 검증) |
+| `server/trace.py`, `server/monitor.html` | 트레이스 이벤트(`/trace`, `/trace/events`)와 실시간 모니터 페이지(`/monitor`) |
 | `tools/lacal_cli.py` | `graph`, `service list`, `topic list/info/hz/echo`, `events`, `trace`, `pub` |
-| `tests/test_session_certs.py` | One test per LACAL-000001..014 CERT behaviour |
+| `tests/test_session_certs.py` | CERT LACAL-000001~014의 동작마다 테스트 하나씩 |
 
-## Interpretations and known limits
-* **Field splitting:** OWP splits fields on spaces and tabs, but JSON can contain spaces. The last
-  field of `INIT`, `PUB` and `MSG` is therefore read as "the rest of the frame".
-* **INIT failures:** the server sends `-ERR` and then closes with code 1008 ("fail the connection").
-* **Subscription groups:** they are balanced per server. Groups whose members sit on different
-  servers each receive the message once per server (cross-server coordination is future work).
-* **Payload encoding:** only OMS JSON is used. EXI (`encoding` 3) and DDS-Security (mTLS) are not
-  implemented yet.
-* **Decimals:** `xs:decimal` values are mapped through Python floats. The A-GRA schema uses
-  `double`/`int` types in practice.
-* **Windows:** the server uses the Selector event loop. The Proactor loop stops listening after a single
-  aborted accept (WinError 64).
-* **DDS threading:** DDS readers are served by a WaitSet thread, not listeners. Python listeners
-  deadlock against `DataWriter.write()` because of the GIL and Cyclone's internal locks.
+## 규격 해석과 알려진 제약
+* **필드 분리:** OWP는 공백과 탭으로 필드를 나누지만, JSON 안에도 공백이 들어갈 수 있습니다. 그래서 `INIT`, `PUB`, `MSG`의 마지막 필드는 "프레임의 나머지 전체"로 읽습니다.
+* **INIT 실패:** 서버는 `-ERR`를 보낸 뒤 종료 코드 1008로 연결을 닫습니다("fail the connection").
+* **Subscription Group:** 서버 단위로 분배합니다. 멤버가 여러 서버에 흩어져 있으면 서버마다 한 번씩 전달됩니다(서버 간 조정은 향후 과제).
+* **payload 인코딩:** OMS JSON만 사용합니다. EXI(`encoding` 3)와 DDS-Security(mTLS)는 아직 구현하지 않았습니다.
+* **Decimal:** `xs:decimal` 값은 Python float로 변환합니다. A-GRA 스키마는 실제로 `double`/`int` 계열만 씁니다.
+* **Windows:** 서버는 Selector 이벤트 루프를 씁니다. 기본 Proactor 루프는 accept가 한 번만 중단돼도(WinError 64) 수신 대기를 멈춥니다.
+* **DDS 스레딩:** DDS reader는 listener 대신 WaitSet 스레드로 처리합니다. Python listener는 GIL과 Cyclone 내부 락 때문에 `DataWriter.write()`와 교착을 일으킵니다.
