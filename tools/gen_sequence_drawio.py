@@ -1,6 +1,6 @@
 """Generate docs/sequence_dms.drawio: sequence diagram of the DMS MMS demo (tools/run_demo.py --dds).
 
-    python tools/gen_sequence_drawio.py
+    uv run python tools/gen_sequence_drawio.py
     "C:/Program Files/draw.io/draw.io.exe" -x -f png -s 1.5 -o docs/sequence_dms.png docs/sequence_dms.drawio
 """
 from __future__ import annotations

@@ -13,8 +13,8 @@ The upstream MessageDefinitions XSD includes "A-GRA_SecurityMarkings_v6_0.xsd" b
 in the ASK is named "A-GRA_SecurityMarkings_v6_0_a.xsd"; the copy written here points at the real name.
 
 Usage:
-    python tools/prepare_schema.py --download [--ref main]
-    python tools/prepare_schema.py --src <ASK>/A-GRA_standard/Schema
+    uv run python tools/prepare_schema.py --download [--ref main]
+    uv run python tools/prepare_schema.py --src <ASK>/A-GRA_standard/Schema
 """
 import argparse
 import shutil
@@ -88,8 +88,8 @@ def main() -> int:
         install(src)
         return 0
 
-    suggestion = (f"  python tools/prepare_schema.py --download            # from {REPO}\n"
-                  f"  python tools/prepare_schema.py --src <dir>           # from a local checkout's Schema/")
+    suggestion = (f"  uv run python tools/prepare_schema.py --download            # from {REPO}\n"
+                  f"  uv run python tools/prepare_schema.py --src <dir>           # from a local checkout's Schema/")
     if args.src is None and (DST / MSG).is_file() and (DST / SEC).is_file():
         print(f"no local ASK schema found at {src}; keeping the schema already included in {DST}.\n"
               f"To re-import it:\n{suggestion}")

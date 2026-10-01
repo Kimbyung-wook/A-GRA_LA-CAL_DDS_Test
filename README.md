@@ -21,12 +21,23 @@ node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cy
 
 ## Quick start
 ```
-pip install -r requirements.txt
-python -m pytest                          # 80 tests, includes a 2-server DDS test
-python tools/run_demo.py                  # 1 server, local routing
-python tools/run_demo.py --dds            # 2 servers bridged by DDS; prints the cross-server graph
-python tools/run_demo.py --dds --live     # keep running and open the live monitor (Ctrl+C to stop)
+uv sync                                      # create .venv (Python 3.12) with the versions pinned in uv.lock
+uv run pytest                                # 81 tests, includes a 2-server DDS test
+uv run python tools/run_demo.py              # 1 server, local routing
+uv run python tools/run_demo.py --dds        # 2 servers bridged by DDS; prints the cross-server graph
+uv run python tools/run_demo.py --dds --live # keep running and open the live monitor (Ctrl+C to stop)
 ```
+
+### Environment (uv)
+The project is managed with [uv](https://docs.astral.sh/uv/) so its packages never touch the
+system or other projects' Python environments.
+* `pyproject.toml` declares the dependencies (`dev` group: pytest), `.python-version` pins Python 3.12,
+  and `uv.lock` pins every package version. Commit changes to all three together.
+* `uv sync` creates `.venv/` inside the project, downloading Python 3.12 if needed. `uv run <cmd>`
+  runs a command in that environment and re-syncs it first if the lock changed, so no activation is needed.
+  (To use `python ...` directly, activate it: `.venv\Scripts\activate` on Windows, `source .venv/bin/activate` elsewhere.)
+* Add or upgrade a package: `uv add <pkg>` / `uv add --dev <pkg>` / `uv lock --upgrade-package <pkg>`.
+* The project is not installed as a package (`[tool.uv] package = false`); scripts run from the repository root.
 
 ### Live monitoring
 Every routing step (PUB, MSG delivery, DDS out/in, errors, connect/subscribe) is recorded as a
@@ -34,7 +45,7 @@ timestamped trace event:
 * **Web:** `http://127.0.0.1:8766/monitor` shows a sequence-style timeline, per-message rate, interval
   and jitter, and command→status RTT. Add `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776` to merge
   both servers.
-* **Terminal:** `python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
+* **Terminal:** `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
 * The event format is described in `docs/trace_api.md`.
 ### Schema
 `schema/` already contains the A-GRA 6.0a XSDs, so no preparation step is needed after cloning.
@@ -47,18 +58,18 @@ timestamped trace event:
   [Open Arsenal A-GRA repository](https://gitlab.com/open-arsenal/a-gra/standard) (GitLab)
   or copy them from a local checkout. Both paths apply the same include fix:
   ```
-  python tools/prepare_schema.py --download [--ref main]          # branch, tag or commit
-  python tools/prepare_schema.py --src <checkout>/Schema
+  uv run python tools/prepare_schema.py --download [--ref main]          # branch, tag or commit
+  uv run python tools/prepare_schema.py --src <checkout>/Schema
   ```
   Without options the script uses `../OpenArsenalGit/A-GRA_standard/Schema` if it exists. Otherwise it
   keeps the bundled schema and prints the commands above.
 
 Manual run (three terminals):
 ```
-python -m server --config config/server_a.yaml
-python nodes/node_b.py
-python nodes/node_a.py --count 5 --linger 30
-python tools/lacal_cli.py graph            # while node_a lingers; --dot for Graphviz
+uv run python -m server --config config/server_a.yaml
+uv run python nodes/node_b.py
+uv run python nodes/node_a.py --count 5 --linger 30
+uv run python tools/lacal_cli.py graph            # while node_a lingers; --dot for Graphviz
 ```
 
 ## What is on the wire

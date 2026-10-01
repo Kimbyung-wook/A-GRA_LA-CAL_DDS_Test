@@ -11,8 +11,8 @@
 |---|---|
 | `http://127.0.0.1:8766/monitor` | 웹 실시간 모니터: 시퀀스 형태 타임라인, 메시지별 타이밍, 명령→응답 RTT, 이벤트 상세 |
 | `.../monitor?admin=http://127.0.0.1:8766,http://127.0.0.1:8776` | 여러 CAL Server를 하나의 타임라인으로 합쳐 봅니다(서버 간 DDS 구간이 보임) |
-| `python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace` | 터미널에 이벤트를 한 줄씩 출력(`--kinds`, `--filter`, `--backlog`) |
-| `python tools/run_demo.py --dds --live` | 서버 2개와 노드 2개를 계속 실행하고 모니터를 엽니다 |
+| `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace` | 터미널에 이벤트를 한 줄씩 출력(`--kinds`, `--filter`, `--backlog`) |
+| `uv run python tools/run_demo.py --dds --live` | 서버 2개와 노드 2개를 계속 실행하고 모니터를 엽니다 |
 
 ## 엔드포인트
 | 메서드 | 경로 | 반환 |

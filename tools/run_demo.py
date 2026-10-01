@@ -1,8 +1,8 @@
 """Launch CAL Server(s) and both nodes, run the scenario, print the graph, clean up.
 
-    python tools/run_demo.py            # one CAL Server, local routing
-    python tools/run_demo.py --dds      # two CAL Servers bridged by Cyclone DDS
-    python tools/run_demo.py --dds --live   # keep everything running and open the live monitor
+    uv run python tools/run_demo.py            # one CAL Server, local routing
+    uv run python tools/run_demo.py --dds      # two CAL Servers bridged by Cyclone DDS
+    uv run python tools/run_demo.py --dds --live   # keep everything running and open the live monitor
 """
 from __future__ import annotations
 
@@ -120,7 +120,7 @@ def live(args, spawn, url_a: str, servers) -> int:
     admins = ",".join(f"http://127.0.0.1:{admin}" for _, admin in servers)
     url = f"http://127.0.0.1:{servers[0][1]}/monitor" + (f"?admin={admins}" if len(servers) > 1 else "")
     print(f"live monitor: {url}")
-    print(f"terminal trace: python tools/lacal_cli.py --admin http://127.0.0.1:{servers[0][1]} trace")
+    print(f"terminal trace: uv run python tools/lacal_cli.py --admin http://127.0.0.1:{servers[0][1]} trace")
     print("press Ctrl+C to stop")
     if not args.no_browser:
         webbrowser.open(url)

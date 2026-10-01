@@ -11,8 +11,8 @@ by your own tools. They are served on the admin port (default `8766`).
 |---|---|
 | `http://127.0.0.1:8766/monitor` | Live web monitor: a sequence-style timeline, per-message timing, command→status RTT and event details |
 | `.../monitor?admin=http://127.0.0.1:8766,http://127.0.0.1:8776` | Merges several CAL Servers into one timeline (DDS hops between servers become visible) |
-| `python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace` | One line per event in the terminal (`--kinds`, `--filter`, `--backlog`) |
-| `python tools/run_demo.py --dds --live` | Starts two servers and both nodes continuously and opens the monitor |
+| `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace` | One line per event in the terminal (`--kinds`, `--filter`, `--backlog`) |
+| `uv run python tools/run_demo.py --dds --live` | Starts two servers and both nodes continuously and opens the monitor |
 
 ## Endpoints
 | Method | Path | Returns |

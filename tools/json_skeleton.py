@@ -5,7 +5,7 @@ types are replaced by their cheapest concrete derivation (with "$type"), and sim
 are synthesised from facets (enumeration, length, range, pattern).
 
 Usage:
-    python tools/json_skeleton.py SystemStatus [--check]
+    uv run python tools/json_skeleton.py SystemStatus [--check]
 """
 from __future__ import annotations
 

@@ -1,14 +1,14 @@
 """lacal: ros2-style command line for a CAL Server's graph/admin API.
 
-    python tools/lacal_cli.py graph [--dot]
-    python tools/lacal_cli.py service list
-    python tools/lacal_cli.py topic list
-    python tools/lacal_cli.py topic info <topic> <message>
-    python tools/lacal_cli.py topic hz   <topic> <message>
-    python tools/lacal_cli.py topic echo [--topic T] [--msg M]
-    python tools/lacal_cli.py events
-    python tools/lacal_cli.py trace [--kinds pub,deliver,dds_in,dds_out,err] [--filter TEXT]
-    python tools/lacal_cli.py pub <topic> <file.json|-> [--url ws://...] [--service test_client]
+    uv run python tools/lacal_cli.py graph [--dot]
+    uv run python tools/lacal_cli.py service list
+    uv run python tools/lacal_cli.py topic list
+    uv run python tools/lacal_cli.py topic info <topic> <message>
+    uv run python tools/lacal_cli.py topic hz   <topic> <message>
+    uv run python tools/lacal_cli.py topic echo [--topic T] [--msg M]
+    uv run python tools/lacal_cli.py events
+    uv run python tools/lacal_cli.py trace [--kinds pub,deliver,dds_in,dds_out,err] [--filter TEXT]
+    uv run python tools/lacal_cli.py pub <topic> <file.json|-> [--url ws://...] [--service test_client]
 
 Global option --admin selects the admin endpoint (default http://127.0.0.1:8766).
 """

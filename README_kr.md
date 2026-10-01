@@ -17,18 +17,29 @@ node_a (MA, "ma_core") ──WS "owp" + OMS JSON──► CAL Server A ══ Cy
 
 ## 빠른 시작
 ```
-pip install -r requirements.txt
-python -m pytest                          # 테스트 80개 (서버 2개 DDS 테스트 포함)
-python tools/run_demo.py                  # 서버 1개, 로컬 라우팅
-python tools/run_demo.py --dds            # DDS로 연결된 서버 2개, 서버 간 병합 그래프 출력
-python tools/run_demo.py --dds --live     # 계속 실행하면서 실시간 모니터 열기 (Ctrl+C로 종료)
+uv sync                                      # uv.lock에 고정된 버전으로 .venv(Python 3.12) 생성
+uv run pytest                                # 테스트 81개 (서버 2개 DDS 테스트 포함)
+uv run python tools/run_demo.py              # 서버 1개, 로컬 라우팅
+uv run python tools/run_demo.py --dds        # DDS로 연결된 서버 2개, 서버 간 병합 그래프 출력
+uv run python tools/run_demo.py --dds --live # 계속 실행하면서 실시간 모니터 열기 (Ctrl+C로 종료)
 ```
+
+### 실행 환경 (uv)
+이 프로젝트는 [uv](https://docs.astral.sh/uv/)로 관리합니다. 패키지가 시스템 Python이나 다른 프로젝트의
+환경에 섞이지 않습니다.
+* `pyproject.toml`에 의존성(`dev` 그룹: pytest)을, `.python-version`에 Python 3.12를, `uv.lock`에 모든 패키지
+  버전을 고정합니다. 세 파일은 함께 커밋합니다.
+* `uv sync`는 프로젝트 안에 `.venv/`를 만들고, 필요하면 Python 3.12도 내려받습니다. `uv run <명령>`은 그 환경에서
+  명령을 실행하며, lock이 바뀌었으면 먼저 동기화하므로 따로 활성화할 필요가 없습니다.
+  (`python ...`을 직접 쓰려면 활성화합니다. Windows: `.venv\Scripts\activate`, 그 외: `source .venv/bin/activate`)
+* 패키지 추가/업그레이드: `uv add <pkg>` / `uv add --dev <pkg>` / `uv lock --upgrade-package <pkg>`
+* 패키지로 설치하지 않습니다(`[tool.uv] package = false`). 스크립트는 저장소 루트에서 실행합니다.
 
 ### 실시간 모니터링
 모든 라우팅 단계(PUB, MSG 전달, DDS 송/수신, 오류, 연결/구독)가 타임스탬프가 붙은 트레이스 이벤트로 기록됩니다.
 * **웹:** `http://127.0.0.1:8766/monitor`에서 시퀀스 형태 타임라인, 메시지별 빈도·간격·지터, 명령→응답 RTT를
   볼 수 있습니다. `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776`을 붙이면 두 서버를 합쳐 봅니다.
-* **터미널:** `python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
+* **터미널:** `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
 * 이벤트 형식은 `docs/trace_api_kr.md`에 정리했습니다.
 ### 스키마
 `schema/`에 A-GRA 6.0a XSD가 이미 들어 있으므로 clone 후 별도 준비 단계가 필요 없습니다.
@@ -40,18 +51,18 @@ python tools/run_demo.py --dds --live     # 계속 실행하면서 실시간 모
 * XSD를 다시 가져오려면(예: ASK 새 릴리스) [Open Arsenal A-GRA 저장소](https://gitlab.com/open-arsenal/a-gra/standard)(GitLab)에서
   내려받거나 로컬 checkout에서 복사합니다. 두 방식 모두 같은 include 보정을 적용합니다.
   ```
-  python tools/prepare_schema.py --download [--ref main]          # 브랜치, 태그 또는 커밋
-  python tools/prepare_schema.py --src <checkout>/Schema
+  uv run python tools/prepare_schema.py --download [--ref main]          # 브랜치, 태그 또는 커밋
+  uv run python tools/prepare_schema.py --src <checkout>/Schema
   ```
   옵션 없이 실행하면 `../OpenArsenalGit/A-GRA_standard/Schema`가 있을 때 그 경로를 씁니다. 없으면 포함된
   스키마를 그대로 두고 위 명령을 안내합니다.
 
 수동 실행(터미널 3개):
 ```
-python -m server --config config/server_a.yaml
-python nodes/node_b.py
-python nodes/node_a.py --count 5 --linger 30
-python tools/lacal_cli.py graph            # node_a가 연결을 유지하는 동안 실행, Graphviz 출력은 --dot
+uv run python -m server --config config/server_a.yaml
+uv run python nodes/node_b.py
+uv run python nodes/node_a.py --count 5 --linger 30
+uv run python tools/lacal_cli.py graph            # node_a가 연결을 유지하는 동안 실행, Graphviz 출력은 --dot
 ```
 
 ## 구간별 전송 형태

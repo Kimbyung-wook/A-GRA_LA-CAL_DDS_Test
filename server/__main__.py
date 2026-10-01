@@ -1,4 +1,4 @@
-"""python -m server --config config/server_a.yaml"""
+"""uv run python -m server --config config/server_a.yaml"""
 import argparse
 import asyncio
 import faulthandler
