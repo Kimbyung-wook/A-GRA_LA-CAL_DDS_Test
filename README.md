@@ -40,7 +40,7 @@ uv run python tools/run_demo.py --dds --live # 계속 실행하면서 실시간 
 * **웹:** `http://127.0.0.1:8766/monitor`에서 시퀀스 형태 타임라인, 메시지별 빈도·간격·지터, 명령→응답 RTT를
   볼 수 있습니다. `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776`을 붙이면 두 서버를 합쳐 봅니다.
 * **터미널:** `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
-* 이벤트 형식은 `docs/trace_api_kr.md`에 정리했습니다.
+* 이벤트 형식은 `docs/trace_api.md`에 정리했습니다.
 ### 스키마
 `schema/`에 A-GRA 6.0a XSD가 이미 들어 있으므로 clone 후 별도 준비 단계가 필요 없습니다.
 * `A-GRA_MessageDefinitions_v6_0_a.xsd`는 **보정된 사본**입니다. 원본은 `A-GRA_SecurityMarkings_v6_0.xsd`를
@@ -84,7 +84,7 @@ uv run python tools/lacal_cli.py graph            # node_a가 연결을 유지�
 | `server/omsjson.py` | OMS JSON ⇄ XML 코덱과 XSD 검증. 스키마의 전역 요소 860개 전체로 검증을 마쳤습니다 |
 | `server/owp_codec.py`, `session.py` | OWP 파싱과 연결별 상태 머신(`AWAIT_INIT → READY → CLOSED`) |
 | `server/router.py` | 메시지 분배(fan-out), Subscription Group(그룹+토픽당 한 멤버에게만 전달), 탭 |
-| `server/graph.py`, `app.py` | pub/sub 그래프와 관리 API. JSON 형식은 `docs/graph_api_kr.md`에 정의했습니다 |
+| `server/graph.py`, `app.py` | pub/sub 그래프와 관리 API. JSON 형식은 `docs/graph_api.md`에 정의했습니다 |
 | `server/backend_dds.py` | Cyclone DDS 백엔드. `lacal/graph` 토픽(TRANSIENT_LOCAL, 서버별 key)으로 그래프를 동기화합니다 |
 | `server/config.py`, `config/*.yaml` | Network Configuration: 서비스, UUID, 허용 토픽, 백엔드 |
 | `client/lacal_client.py` | asyncio 기반 CAL Client |

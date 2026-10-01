@@ -63,7 +63,7 @@ class CalEnvelope(IdlStruct, typename="lacal::CalEnvelope"):
 @dataclass
 class GraphState(IdlStruct, typename="lacal::GraphState"):
     server_id: str
-    snapshot: str      # JSON, see docs/graph_api.md
+    snapshot: str      # JSON, see docs/graph_api_en.md
     key("server_id")
 
 

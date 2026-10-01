@@ -46,7 +46,7 @@ timestamped trace event:
   and jitter, and command→status RTT. Add `?admin=http://127.0.0.1:8766,http://127.0.0.1:8776` to merge
   both servers.
 * **Terminal:** `uv run python tools/lacal_cli.py --admin http://127.0.0.1:8766 trace`
-* The event format is described in `docs/trace_api.md`.
+* The event format is described in `docs/trace_api_en.md`.
 ### Schema
 `schema/` already contains the A-GRA 6.0a XSDs, so no preparation step is needed after cloning.
 * `A-GRA_MessageDefinitions_v6_0_a.xsd` is a **patched copy**. Upstream it includes
@@ -90,7 +90,7 @@ A-GRA L1 `MA_DataPayloadWrapper`.
 | `server/omsjson.py` | OMS JSON ⇄ XML codec plus XSD validation. It is checked on all 860 global elements of the schema |
 | `server/owp_codec.py`, `session.py` | OWP parsing and the per-connection state machine (`AWAIT_INIT → READY → CLOSED`) |
 | `server/router.py` | Fan-out, subscription groups (one member per group+topic) and taps |
-| `server/graph.py`, `app.py` | Pub/sub graph and the admin API. The contract is in `docs/graph_api.md` (Korean: `docs/graph_api_kr.md`) |
+| `server/graph.py`, `app.py` | Pub/sub graph and the admin API. The contract is in `docs/graph_api_en.md` (Korean: `docs/graph_api.md`) |
 | `server/backend_dds.py` | Cyclone DDS backend and graph sync on `lacal/graph` (TRANSIENT_LOCAL, keyed by server) |
 | `server/config.py`, `config/*.yaml` | Network Configuration: services, UUIDs, allowed topics, backend |
 | `client/lacal_client.py` | asyncio CAL Client |

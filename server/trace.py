@@ -1,4 +1,4 @@
-"""Message timing trace: one event per routing step, streamed to monitors (see docs/trace_api.md).
+"""Message timing trace: one event per routing step, streamed to monitors (see docs/trace_api_en.md).
 
 Kinds:
   connect / disconnect      a CAL Client finished INIT / went away

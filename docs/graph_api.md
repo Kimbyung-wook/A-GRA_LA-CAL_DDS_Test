@@ -1,26 +1,26 @@
-# Graph API (contract for rqt_graph-style viewers)
+# 그래프 API (rqt_graph 스타일 뷰어를 위한 계약)
 
-> 한국어: [graph_api_kr.md](graph_api_kr.md)
+> English: [graph_api_en.md](graph_api_en.md)
 
-Served by every CAL Server on its **admin port** (default `8766`), separate from the OWP port.
-`api_version` is `1`; additive changes keep the version, removals/renames bump it.
+모든 CAL Server가 OWP 포트와 분리된 **관리 포트**(기본 `8766`)에서 제공합니다.
+`api_version`은 `1`입니다. 항목을 추가할 때는 버전을 유지하고, 삭제하거나 이름을 바꿀 때는 올립니다.
 
-## Endpoints
+## 엔드포인트
 
-| Method | Path | Returns |
+| 메서드 | 경로 | 반환 |
 |---|---|---|
-| GET | `/graph` | Merged snapshot: this server plus graphs received from other servers over DDS |
-| GET | `/graph/local` | This server only (the document each server publishes on DDS topic `lacal/graph`) |
-| GET | `/graph.dot` | Graphviz DOT of `/graph` (`dot -Tpng`) |
-| GET | `/services`, `/topics` | The service or topic nodes of `/graph` |
-| GET | `/stats` | Router counters: `published`, `delivered`, `dropped`, `remote_in`, `remote_out`, `sessions` |
+| GET | `/graph` | 병합 스냅샷: 이 서버와, DDS로 받은 다른 서버들의 그래프 |
+| GET | `/graph/local` | 이 서버만의 그래프. 각 서버가 DDS 토픽 `lacal/graph`로 발행하는 문서와 같습니다 |
+| GET | `/graph.dot` | `/graph`의 Graphviz DOT(`dot -Tpng`으로 렌더링) |
+| GET | `/services`, `/topics` | `/graph` 중 서비스 노드 또는 토픽 노드 |
+| GET | `/stats` | 라우터 카운터: `published`, `delivered`, `dropped`, `remote_in`, `remote_out`, `sessions` |
 | GET | `/healthz` | `ok` |
-| WS | `/graph/events` | `snapshot` first, then incremental events (below) |
-| WS | `/tap?topic=T&msg=M` | Every message routed on the server, filters optional (`topic echo`) |
+| WS | `/graph/events` | 먼저 `snapshot`을 보내고, 이후 증분 이벤트를 보냅니다(아래 참고) |
+| WS | `/tap?topic=T&msg=M` | 서버가 라우팅하는 모든 메시지. 필터는 선택 사항입니다(`topic echo`에 해당) |
 
-HTTP responses carry `Access-Control-Allow-Origin: *` so a browser page can be the viewer.
+브라우저 페이지를 뷰어로 쓸 수 있도록 HTTP 응답에 `Access-Control-Allow-Origin: *`를 붙입니다.
 
-## Snapshot (`GET /graph`)
+## 스냅샷 (`GET /graph`)
 
 ```json
 {
@@ -43,42 +43,42 @@ HTTP responses carry `Access-Control-Allow-Origin: *` so a browser page can be t
      "first_seen": 0.0, "last_seen": 0.0, "msg_count": 5, "byte_count": 9120, "rate_hz": 1.0,
      "invalid_count": 0, "drop_count": 0, "active": true, "sub_id": null, "group": null},
     {"kind": "sub", "id": "sub:svc:calsrv-b:1:s2", "source": "topic:ms.dms/MA_TxDataPayloadCommand",
-     "target": "svc:calsrv-b:1", "sub_id": "s2", "group": null, "active": true, "...": "same counters"}
+     "target": "svc:calsrv-b:1", "sub_id": "s2", "group": null, "active": true, "...": "같은 카운터"}
   ]
 }
 ```
 
-Semantics:
+의미:
 
-* **Service node**: one live OWP connection after a successful `INIT`. Removed on disconnect.
-* **Topic node**: a *(CAL topic, message name)* pair, because an OWP subscription is keyed by both.
-  Topic nodes with the same id are shared between servers in the merged view. A topic node disappears
-  when no edge references it.
-* **pub edge**: created on the service's **first accepted PUB** (OWP has no advertise operation).
-  `active` becomes `false` when nothing was published for `graph.inactive_after_s` (default 10 s).
-* **sub edge**: exists from `SUB` until `UNSUB`/disconnect. `group` is the subscription group.
-  Counters count deliveries (`drop_count` = outbound queue full).
-* `rate_hz`: messages in the last 5 s divided by 5.
-* `declared`: the Service Contract view from the server config, to compare with what is observed.
+* **서비스 노드:** `INIT`에 성공한 OWP 연결 하나입니다. 연결이 끊기면 제거됩니다.
+* **토픽 노드:** *(CAL 토픽, 메시지 이름)* 쌍입니다. OWP 구독이 이 두 값을 함께 key로 쓰기 때문입니다.
+  병합 뷰에서는 id가 같은 토픽 노드를 여러 서버가 공유합니다. 어떤 엣지도 참조하지 않으면 토픽 노드는 사라집니다.
+* **pub 엣지:** 서비스의 **첫 번째 정상 PUB** 때 생성됩니다. OWP에는 발행 예정을 알리는(advertise) 명령이 없기 때문입니다.
+  `graph.inactive_after_s`(기본 10초) 동안 발행이 없으면 `active`가 `false`가 됩니다.
+* **sub 엣지:** `SUB`부터 `UNSUB` 또는 연결 종료까지 존재합니다. `group`은 Subscription Group입니다.
+  카운터는 전달 횟수를 셉니다(`drop_count`는 송신 큐가 가득 차 버린 건수).
+* `rate_hz`: 최근 5초 동안의 메시지 수를 5로 나눈 값입니다.
+* `declared`: 서버 설정에 적은 Service Contract 관점의 pub/sub 목록입니다. 실제 관측과 비교하는 용도입니다.
 
-## Events (`WS /graph/events`)
+## 이벤트 (`WS /graph/events`)
 
-The first frame is `{"type": "snapshot", "graph": <snapshot>}`. After that:
+첫 프레임은 `{"type": "snapshot", "graph": <스냅샷>}`입니다. 그 뒤로는 다음 이벤트가 옵니다.
 
-| `type` | Payload |
+| `type` | 내용 |
 |---|---|
-| `node_added` | `node` (as in the snapshot) |
+| `node_added` | `node` (스냅샷과 같은 형식) |
 | `node_removed` | `id` |
 | `edge_added` | `edge` |
 | `edge_removed` | `id` |
-| `remote_updated` / `remote_removed` | `remote_server_id`; re-read `GET /graph` for the merged view |
-| `stats` | `edges: [{id, msg_count, byte_count, rate_hz, drop_count, active}]` about once per second, local edges only |
+| `remote_updated` / `remote_removed` | `remote_server_id`. 병합 뷰는 `GET /graph`로 다시 읽습니다 |
+| `stats` | `edges: [{id, msg_count, byte_count, rate_hz, drop_count, active}]`. 약 1초마다, 로컬 엣지만 |
 
-Every event also carries `server_id` and `t` (epoch seconds). A slow observer can lose events
-(the queue is bounded) and should resynchronise with `GET /graph`.
+모든 이벤트에는 `server_id`와 `t`(epoch 초)가 붙습니다. 큐 크기가 제한되어 있어서 느린 관찰자는 이벤트를 놓칠 수 있습니다.
+그럴 때는 `GET /graph`로 다시 동기화합니다.
 
-## Suggested rendering (future viewer)
+## 권장 렌더링 (향후 뷰어)
 
-Cytoscape.js or similar: services are ellipses and topics are boxes. Edge width follows `rate_hz`,
-inactive edges are grey, and a compound box groups the services of each server. Filters apply to
-message name, service and `primitive`.
+Cytoscape.js 등을 권장합니다. 서비스는 타원, 토픽은 사각형으로 그립니다.
+- 엣지 굵기는 `rate_hz`를 따르고, 비활성 엣지는 회색으로 표시합니다.
+- 서버마다 서비스를 묶는 복합 박스를 둡니다.
+- 필터 기준은 메시지 이름, 서비스, `primitive`입니다.

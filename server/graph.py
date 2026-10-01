@@ -2,7 +2,7 @@
 
 OWP has no introspection operation and DDS discovery only sees CAL Servers, so the CAL Server
 itself is the source of truth: it records which Service publishes / subscribes to which
-(message name, CAL topic) pair. See docs/graph_api.md for the JSON contract.
+(message name, CAL topic) pair. See docs/graph_api_en.md for the JSON contract.
 """
 from __future__ import annotations
 
